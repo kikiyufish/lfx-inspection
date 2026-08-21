@@ -97,6 +97,24 @@ export default function ResultPage() {
     }
   };
 
+  // 导出单店Excel（检查表+报表）
+  const handleExportExcel = async () => {
+    try {
+      const res = await fetch(`/api/inspections/${params.id}/excel`);
+      if (!res.ok) throw new Error("导出失败");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.download = `老凤祥单店督导检查表及报表（${data?.store_name}）${data?.inspection_date}.xlsx`;
+      link.href = url;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("导出Excel失败:", err);
+      alert("导出Excel失败，请重试");
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -152,6 +170,12 @@ export default function ResultPage() {
             className="text-xs px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg font-medium"
           >
             导出报告
+          </button>
+          <button
+            onClick={handleExportExcel}
+            className="text-xs px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg font-medium"
+          >
+            导出Excel
           </button>
           <button
             onClick={handleExportPDF}
