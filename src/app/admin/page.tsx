@@ -2,10 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 
 export default function AdminLoginPage() {
-  const router = useRouter();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -26,7 +24,8 @@ export default function AdminLoginPage() {
       const data = await res.json();
 
       if (data.success) {
-        router.push('/history');
+        // 使用 window.location 强制刷新页面，确保管理员状态重新检查
+        window.location.href = '/history';
       } else {
         setError(data.error || '登录失败');
       }
