@@ -153,6 +153,40 @@ export default function HistoryPage() {
     }
   };
 
+  const handleBatchDelete = async () => {
+    if (selectedIds.size === 0) {
+      alert("请先选择要删除的记录");
+      return;
+    }
+    if (!confirm(`确定要删除选中的 ${selectedIds.size} 条记录吗？此操作不可恢复！`)) {
+      return;
+    }
+    setDeletingId(-1); // 使用-1表示批量删除中
+    try {
+      const deletePromises = Array.from(selectedIds).map((id) =>
+        fetch(`/api/inspections/${id}/delete`, {
+          method: "DELETE",
+          credentials: "include",
+        })
+      );
+      const results = await Promise.all(deletePromises);
+      const allSuccess = results.every((r) => r.ok);
+      
+      if (allSuccess) {
+        setRecords((prev) => prev.filter((r) => !selectedIds.has(r.id)));
+        setSelectedIds(new Set());
+        alert(`成功删除 ${selectedIds.size} 条记录`);
+      } else {
+        alert("部分记录删除失败，请刷新页面重试");
+      }
+    } catch (err) {
+      console.error("批量删除失败:", err);
+      alert("删除失败，请重试");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const getRatingBadge = (score: number) => {
     const info = getRatingInfo(score);
     return (
@@ -218,11 +252,25 @@ export default function HistoryPage() {
               />
               全选
             </label>
-            {selectedIds.size > 0 && (
-              <span className="text-xs text-amber-600 font-medium">
-                已选 {selectedIds.size} 项
-              </span>
-            )}
+            <div className="flex items-center gap-3">
+              {selectedIds.size > 0 && (
+                <span className="text-xs text-amber-600 font-medium">
+                  已选 {selectedIds.size} 项
+                </span>
+              )}
+              {isAdmin && selectedIds.size > 0 && (
+                <button
+                  onClick={handleBatchDelete}
+                  disabled={deletingId !== null}
+                  className="px-3 py-1 text-xs text-white bg-red-500 rounded-md hover:bg-red-600 disabled:opacity-50 transition-colors flex items-center gap-1"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  {deletingId === -1 ? "删除中..." : "批量删除"}
+                </button>
+              )}
+            </div>
           </div>
         )}
 
