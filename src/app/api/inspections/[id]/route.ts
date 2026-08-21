@@ -25,7 +25,7 @@ export async function GET(
     // 查询检查项目
     const { data: items, error: itemsError } = await client
       .from("inspection_items")
-      .select("id, item_number, category, description, max_score, actual_score, notes, photo_keys, problem_level")
+      .select("id, item_number, category, description, max_score, actual_score, notes, photo_keys")
       .eq("inspection_id", parseInt(id))
       .order("item_number", { ascending: true });
 

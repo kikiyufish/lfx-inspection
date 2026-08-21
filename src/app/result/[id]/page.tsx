@@ -29,7 +29,6 @@ interface InspectionResult {
     notes: string | null;
     photo_keys: string[] | null;
     photo_urls: string[];
-    problem_level: string | null;
   }[];
 }
 

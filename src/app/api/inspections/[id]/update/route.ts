@@ -99,7 +99,6 @@ export async function PUT(
       actual_score: number;
       notes?: string;
       photo_keys?: string[];
-      problem_level?: string;
     }) => ({
       inspection_id: inspectionId,
       item_number: item.item_number,
@@ -109,7 +108,6 @@ export async function PUT(
       actual_score: item.actual_score,
       notes: item.notes || "",
       photo_keys: item.photo_keys || [],
-      problem_level: item.problem_level || "无",
     }));
 
     if (itemsToInsert.length > 0) {
