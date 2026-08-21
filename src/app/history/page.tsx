@@ -43,9 +43,11 @@ export default function HistoryPage() {
 
     const checkAdmin = async () => {
       try {
-        const res = await fetch("/api/admin/check");
+        const res = await fetch("/api/admin/check", {
+          credentials: "include",
+        });
         const result = await res.json();
-        setIsAdmin(result.isAdmin);
+        setIsAdmin(result.isAdmin === true);
       } catch (err) {
         console.error("检查管理员状态失败:", err);
       }
@@ -129,7 +131,10 @@ export default function HistoryPage() {
       return;
     }
     try {
-      const res = await fetch(`/api/inspections/${id}/delete`, { method: "DELETE" });
+      const res = await fetch(`/api/inspections/${id}/delete`, { 
+        method: "DELETE",
+        credentials: "include",
+      });
       const result = await res.json();
       if (result.success) {
         setRecords((prev) => prev.filter((r) => r.id !== id));

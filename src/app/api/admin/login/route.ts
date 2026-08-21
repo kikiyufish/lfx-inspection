@@ -32,10 +32,14 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // 检测是否通过HTTPS访问
+    const proto = request.headers.get('x-forwarded-proto') || 'http';
+    const isSecure = proto === 'https';
+
     response.cookies.set('admin_token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      secure: isSecure,
+      sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7, // 7天
       path: '/',
     });
