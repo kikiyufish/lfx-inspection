@@ -23,6 +23,8 @@ export default function HistoryPage() {
   const [filter, setFilter] = useState<"all" | "excellent" | "good" | "poor">("all");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [exporting, setExporting] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchHistory = async () => {
@@ -38,7 +40,19 @@ export default function HistoryPage() {
         setLoading(false);
       }
     };
+
+    const checkAdmin = async () => {
+      try {
+        const res = await fetch("/api/admin/check");
+        const result = await res.json();
+        setIsAdmin(result.isAdmin);
+      } catch (err) {
+        console.error("检查管理员状态失败:", err);
+      }
+    };
+
     fetchHistory();
+    checkAdmin();
   }, []);
 
   const filteredRecords = records.filter((r) => {
@@ -105,6 +119,30 @@ export default function HistoryPage() {
       alert("导出失败，请重试");
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleDelete = async (id: number, storeName: string) => {
+    if (!confirm(`确定要删除「${storeName}」的检查记录吗？此操作不可恢复！`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/inspections/${id}/delete`, { method: "POST" });
+      const result = await res.json();
+      if (result.success) {
+        setRecords((prev) => prev.filter((r) => r.id !== id));
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+        alert("删除成功");
+      } else {
+        alert(result.error || "删除失败");
+      }
+    } catch (err) {
+      console.error("删除失败:", err);
+      alert("删除失败，请重试");
     }
   };
 
@@ -223,30 +261,40 @@ export default function HistoryPage() {
                   </label>
                   
                   {/* 记录内容 */}
-                  <Link href={`/result/${record.id}`} className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h3 className="font-semibold text-gray-800 text-sm">{record.store_name}</h3>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          {record.region && <span>{record.region} | </span>}
-                          {record.inspection_date} | {record.supervisor_name}
-                        </p>
+                  <div className="flex-1 min-w-0">
+                    <Link href={`/result/${record.id}`} className="block">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <h3 className="font-semibold text-gray-800 text-sm">{record.store_name}</h3>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {record.region && <span>{record.region} | </span>}
+                            {record.inspection_date} | {record.supervisor_name}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-gray-800">{record.total_score}</div>
+                          {getRatingBadge(record.total_score)}
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-gray-800">{record.total_score}</div>
-                        {getRatingBadge(record.total_score)}
+                      <div className="flex items-center justify-between text-xs text-gray-400 mt-2 pt-2 border-t border-gray-50">
+                        <span>提交于 {new Date(record.created_at).toLocaleString("zh-CN")}</span>
+                        <div className="flex items-center gap-2">
+                          {record.status === "edited" && (
+                            <span className="text-blue-500">已修改</span>
+                          )}
+                          <span className="text-amber-600">查看详情 →</span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-gray-400 mt-2 pt-2 border-t border-gray-50">
-                      <span>提交于 {new Date(record.created_at).toLocaleString("zh-CN")}</span>
-                      <div className="flex items-center gap-2">
-                        {record.status === "edited" && (
-                          <span className="text-blue-500">已修改</span>
-                        )}
-                        <span className="text-amber-600">查看详情 →</span>
-                      </div>
-                    </div>
-                  </Link>
+                    </Link>
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleDelete(record.id, record.store_name)}
+                        className="mt-2 w-full py-1.5 text-xs text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                      >
+                        删除记录
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
