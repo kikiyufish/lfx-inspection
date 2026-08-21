@@ -4,9 +4,10 @@ interface ScoreSliderProps {
   maxScore: number;
   value: number;
   onChange: (value: number) => void;
+  isScored?: boolean;
 }
 
-export function ScoreSlider({ maxScore, value, onChange }: ScoreSliderProps) {
+export function ScoreSlider({ maxScore, value, onChange, isScored = true }: ScoreSliderProps) {
   // 生成可选的分数按钮
   const scores = Array.from({ length: maxScore + 1 }, (_, i) => i);
 
@@ -27,7 +28,7 @@ export function ScoreSlider({ maxScore, value, onChange }: ScoreSliderProps) {
             key={score}
             onClick={() => onChange(score)}
             className={`w-8 h-8 rounded-lg text-xs font-bold transition-all active:scale-90 ${
-              value === score
+              value === score && isScored
                 ? getScoreColor(score) + " ring-2 ring-offset-1 ring-amber-300"
                 : "bg-gray-100 text-gray-500 hover:bg-gray-200"
             }`}
@@ -37,6 +38,9 @@ export function ScoreSlider({ maxScore, value, onChange }: ScoreSliderProps) {
         ))}
       </div>
       <span className="text-xs text-gray-400 shrink-0 ml-1">/{maxScore}</span>
+      {!isScored && (
+        <span className="text-[10px] text-orange-500 font-medium ml-1">未评分</span>
+      )}
     </div>
   );
 }

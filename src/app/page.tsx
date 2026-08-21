@@ -54,6 +54,7 @@ export default function InspectionPage() {
   const [region, setRegion] = useState("");
   const [responsiblePerson, setResponsiblePerson] = useState("");
   const [itemData, setItemData] = useState<Record<number, ItemData>>({});
+  const [scoredItems, setScoredItems] = useState<Set<number>>(new Set());
   const [expandedCategory, setExpandedCategory] = useState<string | null>(
     inspectionCategories[0]?.id || null
   );
@@ -141,10 +142,17 @@ export default function InspectionPage() {
     setRegion(draftInfo.region || "");
     setResponsiblePerson(draftInfo.responsiblePerson || "");
     const restoredItemData: Record<number, ItemData> = {};
+    const restoredScored = new Set<number>();
     for (const [key, value] of Object.entries(draftInfo.itemData || {})) {
-      restoredItemData[Number(key)] = value as ItemData;
+      const numKey = Number(key);
+      restoredItemData[numKey] = value as ItemData;
+      // Mark items that have been explicitly scored (have actual_score data)
+      if (value && typeof value === "object" && "actual_score" in value) {
+        restoredScored.add(numKey);
+      }
     }
     setItemData(restoredItemData);
+    setScoredItems(restoredScored);
     if (draftInfo.currentStep) setCurrentStep(draftInfo.currentStep);
     setHasUnsavedChanges(true);
     setDraftInfo(null);
@@ -218,14 +226,17 @@ export default function InspectionPage() {
             // Load item data
             if (data.items && Array.isArray(data.items)) {
               const newItemData: Record<number, ItemData> = {};
+              const newScoredItems = new Set<number>();
               data.items.forEach((item: { item_number: number; actual_score: number; notes: string; photo_keys: string[] }) => {
                 newItemData[item.item_number] = {
                   actual_score: item.actual_score,
                   notes: item.notes || "",
                   photo_keys: item.photo_keys || [],
                 };
+                newScoredItems.add(item.item_number);
               });
               setItemData(newItemData);
+              setScoredItems(newScoredItems);
             }
             setCurrentStep("form");
           }
@@ -247,6 +258,10 @@ export default function InspectionPage() {
           },
         };
       });
+      // Mark as scored when actual_score is set
+      if (field === "actual_score") {
+        setScoredItems((prev) => new Set(prev).add(itemNumber));
+      }
     },
     []
   );
@@ -261,6 +276,21 @@ export default function InspectionPage() {
   const handleSubmit = async () => {
     if (!storeName.trim() || !inspectionDate || !supervisorName.trim()) {
       alert("请填写完整的门店信息");
+      return;
+    }
+
+    // Check all items are scored
+    const unscoredItems = allItems.filter((item) => !scoredItems.has(item.itemNumber));
+    if (unscoredItems.length > 0) {
+      const firstUnscored = unscoredItems[0];
+      alert(`请为所有检查项评分\n\n未评分项：第${firstUnscored.itemNumber}项（共${unscoredItems.length}项未评分）\n\n请返回检查表单，为每一项选择分数后再提交`);
+      // Expand the category containing the first unscored item
+      const category = inspectionCategories.find((cat) =>
+        cat.items.some((i) => i.itemNumber === firstUnscored.itemNumber)
+      );
+      if (category) {
+        setExpandedCategory(category.id);
+      }
       return;
     }
 
@@ -640,6 +670,16 @@ export default function InspectionPage() {
               {ratingInfo.label}
             </span>
           </div>
+          {/* 评分进度 */}
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+            <span className="text-xs text-gray-400">评分进度</span>
+            <span className={`text-xs font-medium ${scoredItems.size === allItems.length ? "text-green-600" : "text-orange-500"}`}>
+              {scoredItems.size}/{allItems.length} 项已评分
+              {scoredItems.size < allItems.length && (
+                <span className="ml-1">（还有{allItems.length - scoredItems.size}项未评分）</span>
+              )}
+            </span>
+          </div>
         </div>
 
         {/* 分类检查项 */}
@@ -658,6 +698,7 @@ export default function InspectionPage() {
               (sum, item) => sum + (itemData[item.itemNumber]?.actual_score || 0),
               0
             )}
+            scoredCount={category.items.filter((item) => scoredItems.has(item.itemNumber)).length}
             renderItem={(item) => (
               <div key={item.itemNumber} className="py-4 border-b border-gray-50 last:border-0">
                 {/* 检查项描述 */}
@@ -675,6 +716,7 @@ export default function InspectionPage() {
                   maxScore={item.maxScore}
                   value={itemData[item.itemNumber]?.actual_score || 0}
                   onChange={(val) => updateItemData(item.itemNumber, "actual_score", val)}
+                  isScored={scoredItems.has(item.itemNumber)}
                 />
 
                 {/* 问题记录 */}

@@ -9,6 +9,7 @@ interface CategorySectionProps {
   onToggle: () => void;
   itemData: Record<number, { actual_score: number; notes: string; photo_keys: string[] }>;
   categoryScore: number;
+  scoredCount?: number;
   renderItem: (item: InspectionCategory["items"][0]) => ReactNode;
 }
 
@@ -17,16 +18,11 @@ export function CategorySection({
   isExpanded,
   onToggle,
   categoryScore,
+  scoredCount,
   renderItem,
 }: CategorySectionProps) {
-  const completionRate = Math.round(
-    (category.items.filter((item) => {
-      const data = category.items.find((i) => i.itemNumber === item.itemNumber);
-      return data;
-    }).length /
-      category.items.length) *
-      100
-  );
+  const hasUnscored = scoredCount !== undefined && scoredCount < category.items.length;
+  const unscoredCount = hasUnscored ? category.items.length - (scoredCount ?? 0) : 0;
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 mb-4 overflow-hidden">
@@ -43,6 +39,9 @@ export function CategorySection({
             <h3 className="font-semibold text-gray-800 text-sm">{category.name}</h3>
             <p className="text-xs text-gray-400">
               {category.items.length}项 · 满分{category.maxScore}分
+              {hasUnscored && (
+                <span className="text-orange-500 ml-1">· {unscoredCount}项未评分</span>
+              )}
             </p>
           </div>
         </div>
