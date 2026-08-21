@@ -21,6 +21,8 @@ export default function InspectionPage() {
     new Date().toISOString().split("T")[0]
   );
   const [supervisorName, setSupervisorName] = useState("");
+  const [region, setRegion] = useState("");
+  const [responsiblePerson, setResponsiblePerson] = useState("");
   const [itemData, setItemData] = useState<Record<number, ItemData>>({});
   const [expandedCategory, setExpandedCategory] = useState<string | null>(
     inspectionCategories[0]?.id || null
@@ -66,6 +68,8 @@ export default function InspectionPage() {
         store_name: storeName.trim(),
         inspection_date: inspectionDate,
         supervisor_name: supervisorName.trim(),
+        region: region.trim(),
+        responsible_person: responsiblePerson.trim(),
         items: allItems.map((item) => ({
           item_number: item.itemNumber,
           category: item.category,
@@ -167,6 +171,32 @@ export default function InspectionPage() {
                   value={supervisorName}
                   onChange={(e) => setSupervisorName(e.target.value)}
                   placeholder="请输入督导姓名"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all text-gray-800"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-1.5">
+                  区域
+                </label>
+                <input
+                  type="text"
+                  value={region}
+                  onChange={(e) => setRegion(e.target.value)}
+                  placeholder="请输入所属区域（如：青浦、徐汇等）"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all text-gray-800"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-1.5">
+                  负责人
+                </label>
+                <input
+                  type="text"
+                  value={responsiblePerson}
+                  onChange={(e) => setResponsiblePerson(e.target.value)}
+                  placeholder="请输入门店负责人姓名"
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all text-gray-800"
                 />
               </div>

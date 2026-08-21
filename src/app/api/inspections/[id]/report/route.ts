@@ -139,7 +139,7 @@ export async function GET(
           new Paragraph({
             children: [
               new TextRun({
-                text: `门店名称：${inspection.store_name || ''}  责任人：________ 巡查评分：${inspection.total_score || 0}分，问题发现：${problemItems.length}项，整改情况：□已完成 □未完成`,
+                text: `区域：${inspection.region || '________'}  门店名称：${inspection.store_name || ''}  负责人：${inspection.responsible_person || '________'}  督导：${inspection.supervisor_name || ''}  巡查评分：${inspection.total_score || 0}分，问题发现：${problemItems.length}项，整改情况：□已完成 □未完成`,
                 size: 24,
               }),
             ],

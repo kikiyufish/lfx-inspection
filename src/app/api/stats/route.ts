@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     // 获取指定时间范围内的所有检查记录
     const { data: records, error } = await client
       .from("inspections")
-      .select("id, store_name, inspection_date, supervisor_name, total_score, rating, status, created_at")
+      .select("id, store_name, region, responsible_person, inspection_date, supervisor_name, total_score, rating, status, created_at")
       .gte("inspection_date", startDateStr)
       .lte("inspection_date", endDateStr)
       .order("created_at", { ascending: false });
@@ -49,9 +49,9 @@ export async function GET(request: Request) {
     };
 
     // 按门店统计
-    const storeMap = new Map<string, { count: number; totalScore: number }>();
+    const storeMap = new Map<string, { count: number; totalScore: number; region: string; responsible: string }>();
     for (const r of allRecords) {
-      const existing = storeMap.get(r.store_name) || { count: 0, totalScore: 0 };
+      const existing = storeMap.get(r.store_name) || { count: 0, totalScore: 0, region: r.region || "", responsible: r.responsible_person || "" };
       existing.count++;
       existing.totalScore += r.total_score;
       storeMap.set(r.store_name, existing);

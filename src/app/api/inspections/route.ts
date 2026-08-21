@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { store_name, inspection_date, supervisor_name, items } = body;
+    const { store_name, inspection_date, supervisor_name, region, responsible_person, items } = body;
 
     if (!store_name || !inspection_date || !supervisor_name) {
       return NextResponse.json(
@@ -36,6 +36,8 @@ export async function POST(request: NextRequest) {
         store_name,
         inspection_date,
         supervisor_name,
+        region: region || null,
+        responsible_person: responsible_person || null,
         total_score: totalScore,
         max_score: 100,
         rating,

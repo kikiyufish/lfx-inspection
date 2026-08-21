@@ -17,6 +17,8 @@ interface InspectionItem {
 interface FullInspection {
   id: number;
   store_name: string;
+  region?: string;
+  responsible_person?: string;
   inspection_date: string;
   supervisor_name: string;
   total_score: number;
@@ -36,6 +38,7 @@ interface StatsData {
     };
   };
   storeStats: {
+    region: string;
     name: string;
     count: number;
     avgScore: number;
@@ -107,7 +110,9 @@ export default function StatsPage() {
 
       // 设置列宽
       detailSheet.columns = [
+        { header: "区域", key: "region", width: 10 },
         { header: "门店名称", key: "store", width: 18 },
+        { header: "负责人", key: "responsible", width: 10 },
         { header: "检查日期", key: "date", width: 12 },
         { header: "督导", key: "supervisor", width: 10 },
         { header: "检查大类", key: "category", width: 14 },
@@ -163,7 +168,9 @@ export default function StatsPage() {
             ? `扣${deduction}分，需整改`
             : item.notes || "";
           const row = detailSheet.addRow({
+            region: inspection.region || "",
             store: inspection.store_name,
+            responsible: inspection.responsible_person || "",
             date: inspection.inspection_date,
             supervisor: inspection.supervisor_name,
             category: item.category,
@@ -286,7 +293,7 @@ export default function StatsPage() {
       data!.storeStats.forEach((s, i) => {
         summarySheet.addRow({
           item: `${i + 1}`,
-          value: `${s.name} / ${s.count}次 / ${s.avgScore}分`,
+          value: `${s.region || ""} ${s.name} / ${s.count}次 / ${s.avgScore}分`,
         });
       });
 
@@ -316,7 +323,7 @@ export default function StatsPage() {
       }
 
       // Row 1: 分类标题行
-      const catRowValues: (string | number)[] = ["", "", "", ""];
+      const catRowValues: (string | number)[] = ["", "", "", "", ""];
       for (const cat of categories) {
         for (let i = 0; i < cat.items.length; i++) {
           catRowValues.push("");
@@ -337,7 +344,7 @@ export default function StatsPage() {
       }
 
       // Row 2: 编号行
-      const numRowValues: (string | number)[] = ["", "", "", ""];
+      const numRowValues: (string | number)[] = ["", "", "", "", ""];
       for (let i = 1; i <= 35; i++) {
         numRowValues.push(i);
       }
@@ -350,7 +357,7 @@ export default function StatsPage() {
       }
 
       // Row 3: 检查项内容行
-      const descRowValues: (string | number)[] = ["", "", "", ""];
+      const descRowValues: (string | number)[] = ["", "", "", "", ""];
       for (let i = 1; i <= 35; i++) {
         const desc = itemDescriptions[i] || "";
         const maxScore = itemMaxScores[i] || 0;
@@ -365,7 +372,7 @@ export default function StatsPage() {
       }
 
       // Row 4: 表头行
-      const probHeaderValues: (string | number)[] = ["店铺名", "责任人", "日期", "得分"];
+      const probHeaderValues: (string | number)[] = ["区域", "店铺名", "负责人", "日期", "得分"];
       for (let i = 1; i <= 35; i++) {
         probHeaderValues.push("");
       }
@@ -395,7 +402,9 @@ export default function StatsPage() {
       // 数据行：每个门店一行
       for (const inspection of fullData) {
         const rowData: (string | number)[] = [
+          inspection.region || "",
           inspection.store_name,
+          inspection.responsible_person || "",
           inspection.supervisor_name,
           inspection.inspection_date,
           inspection.total_score,

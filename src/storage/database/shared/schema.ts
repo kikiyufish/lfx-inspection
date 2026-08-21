@@ -12,6 +12,8 @@ export const inspections = pgTable(
   {
     id: serial().primaryKey(),
     store_name: varchar("store_name", { length: 255 }).notNull(),
+    region: varchar("region", { length: 128 }),
+    responsible_person: varchar("responsible_person", { length: 128 }),
     inspection_date: varchar("inspection_date", { length: 20 }).notNull(),
     supervisor_name: varchar("supervisor_name", { length: 128 }).notNull(),
     total_score: integer("total_score").notNull().default(0),
