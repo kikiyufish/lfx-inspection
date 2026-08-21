@@ -62,6 +62,21 @@ export default function InspectionPage() {
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [currentStep, setCurrentStep] = useState<"info" | "form">("info");
   const [isLoading, setIsLoading] = useState(false);
+
+  // 初始化时从localStorage读取督导姓名
+  useEffect(() => {
+    const savedSupervisor = localStorage.getItem("current_supervisor");
+    if (savedSupervisor) {
+      setSupervisorName(savedSupervisor);
+    }
+  }, []);
+
+  // 督导姓名变更时保存到localStorage
+  useEffect(() => {
+    if (supervisorName) {
+      localStorage.setItem("current_supervisor", supervisorName);
+    }
+  }, [supervisorName]);
   const [todayRecords, setTodayRecords] = useState<TodayRecord[]>([]);
   const [loadingToday, setLoadingToday] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -217,6 +232,15 @@ export default function InspectionPage() {
         .then((result) => {
           if (result.success && result.data) {
             const data = result.data;
+            
+            // 验证督导身份：只能修改自己的记录
+            const currentSupervisor = localStorage.getItem("current_supervisor") || "";
+            if (currentSupervisor && data.supervisor_name && currentSupervisor !== data.supervisor_name) {
+              alert(`您（${currentSupervisor}）只能修改自己的巡店记录，不能修改他人（${data.supervisor_name}）的记录`);
+              window.location.href = "/";
+              return;
+            }
+            
             setStoreName(data.store_name || "");
             setInspectionDate(data.inspection_date || "");
             setSupervisorName(data.supervisor_name || "");
@@ -435,6 +459,38 @@ export default function InspectionPage() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1.5">
+                  督导姓名 <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={supervisorName}
+                  onChange={(e) => setSupervisorName(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all text-gray-800 bg-white"
+                >
+                  <option value="">请选择督导姓名</option>
+                  <option value="张维娅">张维娅</option>
+                  <option value="徐芳">徐芳</option>
+                  <option value="曹聪">曹聪</option>
+                  <option value="朱琼">朱琼</option>
+                  <option value="周鸣">周鸣</option>
+                  <option value="王洁琼">王洁琼</option>
+                  <option value="吴文瑾">吴文瑾</option>
+                  <option value="吴梅">吴梅</option>
+                  <option value="卢峰">卢峰</option>
+                  <option value="程青梅">程青梅</option>
+                  <option value="蒋雯莉">蒋雯莉</option>
+                  <option value="张桦">张桦</option>
+                  <option value="戈巧娟">戈巧娟</option>
+                  <option value="胡惟一">胡惟一</option>
+                  <option value="薛岑">薛岑</option>
+                  <option value="蔡庆">蔡庆</option>
+                  <option value="吴剑锋">吴剑锋</option>
+                  <option value="周明源">周明源</option>
+                  <option value="陈颖莹">陈颖莹</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-600 mb-1.5">
                   门店名称 <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -454,19 +510,6 @@ export default function InspectionPage() {
                   type="date"
                   value={inspectionDate}
                   onChange={(e) => setInspectionDate(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all text-gray-800"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1.5">
-                  督导姓名 <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={supervisorName}
-                  onChange={(e) => setSupervisorName(e.target.value)}
-                  placeholder="请输入督导姓名"
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all text-gray-800"
                 />
               </div>

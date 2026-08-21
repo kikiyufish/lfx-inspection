@@ -38,6 +38,13 @@ export default function ResultPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [currentSupervisor, setCurrentSupervisor] = useState("");
+
+  // 从localStorage读取当前督导姓名
+  useEffect(() => {
+    const saved = localStorage.getItem("current_supervisor") || "";
+    setCurrentSupervisor(saved);
+  }, []);
 
   useEffect(() => {
     const fetchResult = async () => {
@@ -202,13 +209,18 @@ export default function ResultPage() {
           >
             打印
           </button>
-          {data.edit_count === 0 && (
+          {data.edit_count === 0 && currentSupervisor && currentSupervisor === data.supervisor_name && (
             <Link
               href={`/?edit=${params.id}`}
               className="text-xs px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg font-medium"
             >
               修改记录
             </Link>
+          )}
+          {data.edit_count === 0 && (!currentSupervisor || currentSupervisor !== data.supervisor_name) && (
+            <span className="text-xs px-3 py-1.5 bg-gray-50 text-gray-400 rounded-lg" title="只能修改自己的记录">
+              修改记录
+            </span>
           )}
           {data.edit_count > 0 && (
             <span className="text-xs px-3 py-1.5 bg-gray-50 text-gray-400 rounded-lg">
