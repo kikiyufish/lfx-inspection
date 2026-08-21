@@ -20,6 +20,7 @@ export const inspections = pgTable(
     max_score: integer("max_score").notNull().default(100),
     rating: varchar("rating", { length: 20 }),
     status: varchar("status", { length: 20 }).notNull().default("draft"),
+    edit_count: integer("edit_count").notNull().default(0),
     created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },

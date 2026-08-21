@@ -13,7 +13,7 @@ export async function GET(
     // 查询检查主记录
     const { data: inspection, error: inspectionError } = await client
       .from("inspections")
-      .select("id, store_name, inspection_date, supervisor_name, total_score, max_score, rating, status, created_at")
+      .select("id, store_name, region, responsible_person, inspection_date, supervisor_name, total_score, max_score, rating, status, edit_count, created_at")
       .eq("id", parseInt(id))
       .single();
 
@@ -25,7 +25,7 @@ export async function GET(
     // 查询检查项目
     const { data: items, error: itemsError } = await client
       .from("inspection_items")
-      .select("id, item_number, category, description, max_score, actual_score, notes, photo_keys")
+      .select("id, item_number, category, description, max_score, actual_score, notes, photo_keys, problem_level")
       .eq("inspection_id", parseInt(id))
       .order("item_number", { ascending: true });
 

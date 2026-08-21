@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useCallback, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { inspectionCategories, getAllItems, getRatingInfo } from "@/lib/inspection-data";
 import { PhotoUpload } from "@/components/PhotoUpload";
 import { ScoreSlider } from "@/components/ScoreSlider";
@@ -16,6 +16,9 @@ interface ItemData {
 
 export default function InspectionPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get("edit");
+  
   const [storeName, setStoreName] = useState("");
   const [inspectionDate, setInspectionDate] = useState(
     new Date().toISOString().split("T")[0]
@@ -30,8 +33,44 @@ export default function InspectionPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [currentStep, setCurrentStep] = useState<"info" | "form">("info");
+  const [isLoading, setIsLoading] = useState(false);
 
   const allItems = getAllItems();
+
+  // Load existing inspection data if editing
+  useEffect(() => {
+    if (editId) {
+      setIsLoading(true);
+      fetch(`/api/inspections/${editId}`)
+        .then((res) => res.json())
+        .then((result) => {
+          if (result.success && result.data) {
+            const data = result.data;
+            setStoreName(data.store_name || "");
+            setInspectionDate(data.inspection_date || "");
+            setSupervisorName(data.supervisor_name || "");
+            setRegion(data.region || "");
+            setResponsiblePerson(data.responsible_person || "");
+            
+            // Load item data
+            if (data.items && Array.isArray(data.items)) {
+              const newItemData: Record<number, ItemData> = {};
+              data.items.forEach((item: { item_number: number; actual_score: number; notes: string; photo_keys: string[] }) => {
+                newItemData[item.item_number] = {
+                  actual_score: item.actual_score,
+                  notes: item.notes || "",
+                  photo_keys: item.photo_keys || [],
+                };
+              });
+              setItemData(newItemData);
+            }
+            setCurrentStep("form");
+          }
+        })
+        .catch((err) => console.error("Failed to load inspection:", err))
+        .finally(() => setIsLoading(false));
+    }
+  }, [editId]);
 
   const updateItemData = useCallback(
     (itemNumber: number, field: keyof ItemData, value: number | string | string[]) => {
@@ -81,16 +120,27 @@ export default function InspectionPage() {
         })),
       };
 
-      const res = await fetch("/api/inspections", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      let res;
+      if (editId) {
+        // Update existing inspection
+        res = await fetch(`/api/inspections/${editId}/update`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        // Create new inspection
+        res = await fetch("/api/inspections", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }
 
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "提交失败");
 
-      router.push(`/result/${result.data.id}`);
+      router.push(`/result/${editId || result.data.id}`);
     } catch (error) {
       alert(error instanceof Error ? error.message : "提交失败，请重试");
     } finally {

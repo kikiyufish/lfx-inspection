@@ -9,12 +9,15 @@ import { inspectionCategories } from "@/lib/inspection-data";
 interface InspectionResult {
   id: number;
   store_name: string;
+  region: string | null;
+  responsible_person: string | null;
   inspection_date: string;
   supervisor_name: string;
   total_score: number;
   max_score: number;
   rating: string;
   status: string;
+  edit_count: number;
   created_at: string;
   items: {
     id: number;
@@ -26,6 +29,7 @@ interface InspectionResult {
     notes: string | null;
     photo_keys: string[] | null;
     photo_urls: string[];
+    problem_level: string | null;
   }[];
 }
 
@@ -102,10 +106,19 @@ export default function ResultPage() {
     try {
       const res = await fetch(`/api/inspections/${params.id}/excel`);
       if (!res.ok) throw new Error("导出失败");
-      const blob = await res.blob();
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || "导出失败");
+      // 将base64转换为blob
+      const byteChars = atob(json.data.content);
+      const byteNumbers = new Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) {
+        byteNumbers[i] = byteChars.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
-      link.download = `老凤祥单店督导检查表及报表（${data?.store_name}）${data?.inspection_date}.xlsx`;
+      link.download = json.data.filename;
       link.href = url;
       link.click();
       URL.revokeObjectURL(url);
@@ -190,6 +203,19 @@ export default function ResultPage() {
           >
             打印
           </button>
+          {data.edit_count === 0 && (
+            <Link
+              href={`/?edit=${params.id}`}
+              className="text-xs px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg font-medium"
+            >
+              修改记录
+            </Link>
+          )}
+          {data.edit_count > 0 && (
+            <span className="text-xs px-3 py-1.5 bg-gray-50 text-gray-400 rounded-lg">
+              已修改过
+            </span>
+          )}
         </div>
       </div>
 
