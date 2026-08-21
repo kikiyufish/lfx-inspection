@@ -85,18 +85,33 @@ export async function POST(request: NextRequest) {
 }
 
 // GET - 获取检查记录列表
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const supervisor = searchParams.get("supervisor");
+    const date = searchParams.get("date");
+
     const client = getSupabaseClient();
-    const { data, error } = await client
+    let query = client
       .from("inspections")
-      .select("id, store_name, inspection_date, supervisor_name, total_score, rating, status, created_at")
-      .order("created_at", { ascending: false })
-      .limit(50);
+      .select("id, store_name, inspection_date, supervisor_name, region, responsible_person, total_score, rating, status, created_at, edit_count")
+      .order("created_at", { ascending: false });
+
+    if (supervisor) {
+      query = query.eq("supervisor_name", supervisor);
+    }
+    if (date) {
+      query = query.eq("inspection_date", date);
+    }
+    if (!supervisor && !date) {
+      query = query.limit(50);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw new Error(`查询失败: ${error.message}`);
 
-    return NextResponse.json({ success: true, data });
+    return NextResponse.json({ success: true, data: data || [] });
   } catch (error) {
     const message = error instanceof Error ? error.message : "服务器错误";
     return NextResponse.json({ error: message }, { status: 500 });

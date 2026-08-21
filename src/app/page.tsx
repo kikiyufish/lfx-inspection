@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { inspectionCategories, getAllItems, getRatingInfo } from "@/lib/inspection-data";
 import { PhotoUpload } from "@/components/PhotoUpload";
@@ -13,6 +13,33 @@ interface ItemData {
   notes: string;
   photo_keys: string[];
 }
+
+interface DraftData {
+  storeName: string;
+  inspectionDate: string;
+  supervisorName: string;
+  region: string;
+  responsiblePerson: string;
+  itemData: Record<string, ItemData>;
+  currentStep: "info" | "form";
+  savedAt: string;
+}
+
+interface TodayRecord {
+  id: number;
+  store_name: string;
+  region: string;
+  responsible_person: string;
+  inspection_date: string;
+  supervisor_name: string;
+  total_score: number;
+  rating: string;
+  status: string;
+  created_at: string;
+  edit_count: number;
+}
+
+const DRAFT_KEY = "inspection_draft";
 
 export default function InspectionPage() {
   const router = useRouter();
@@ -34,8 +61,142 @@ export default function InspectionPage() {
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [currentStep, setCurrentStep] = useState<"info" | "form">("info");
   const [isLoading, setIsLoading] = useState(false);
+  const [todayRecords, setTodayRecords] = useState<TodayRecord[]>([]);
+  const [loadingToday, setLoadingToday] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isEditMode = !!editId;
 
   const allItems = getAllItems();
+
+  // Auto-save draft to localStorage (debounced, 2 seconds)
+  const saveDraft = useCallback(() => {
+    if (isEditMode) return; // Don't save draft in edit mode
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      const draft: DraftData = {
+        storeName,
+        inspectionDate,
+        supervisorName,
+        region,
+        responsiblePerson,
+        itemData: Object.fromEntries(
+          Object.entries(itemData).map(([k, v]) => [k, { ...v }])
+        ),
+        currentStep,
+        savedAt: new Date().toISOString(),
+      };
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+        setHasUnsavedChanges(true);
+      } catch {
+        // localStorage full or unavailable
+      }
+    }, 2000);
+  }, [storeName, inspectionDate, supervisorName, region, responsiblePerson, itemData, currentStep, isEditMode]);
+
+  // Trigger auto-save when data changes
+  useEffect(() => {
+    if (!isEditMode && (storeName || supervisorName || Object.keys(itemData).length > 0)) {
+      saveDraft();
+    }
+  }, [storeName, supervisorName, itemData, saveDraft, isEditMode]);
+
+  // Clear draft after successful submission
+  const clearDraft = useCallback(() => {
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+      setHasUnsavedChanges(false);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Restore draft on mount
+  useEffect(() => {
+    if (editId) return; // Don't restore draft in edit mode
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (!saved) return;
+      const draft: DraftData = JSON.parse(saved);
+      // Only restore if draft is from today
+      const draftDate = new Date(draft.savedAt);
+      const today = new Date();
+      if (draftDate.toDateString() !== today.toDateString()) {
+        localStorage.removeItem(DRAFT_KEY);
+        return;
+      }
+      // Show restore confirmation
+      const shouldRestore = confirm(
+        `发现今天 ${draftDate.getHours().toString().padStart(2, "0")}:${draftDate.getMinutes().toString().padStart(2, "0")} 保存的草稿` +
+        (draft.storeName ? `（${draft.storeName}）` : "") +
+        `\n是否恢复上次填写的内容？`
+      );
+      if (shouldRestore) {
+        setStoreName(draft.storeName || "");
+        setInspectionDate(draft.inspectionDate || new Date().toISOString().split("T")[0]);
+        setSupervisorName(draft.supervisorName || "");
+        setRegion(draft.region || "");
+        setResponsiblePerson(draft.responsiblePerson || "");
+        // Convert string keys back to number keys
+        const restoredItemData: Record<number, ItemData> = {};
+        for (const [key, value] of Object.entries(draft.itemData || {})) {
+          restoredItemData[Number(key)] = value as ItemData;
+        }
+        setItemData(restoredItemData);
+        if (draft.currentStep) setCurrentStep(draft.currentStep);
+        setHasUnsavedChanges(true);
+      } else {
+        localStorage.removeItem(DRAFT_KEY);
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }, [editId]);
+
+  // Warn before leaving with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges && !isSubmitting) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges, isSubmitting]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, []);
+
+  // Fetch today's records by supervisor name
+  useEffect(() => {
+    if (!supervisorName.trim() || supervisorName.length < 1) {
+      setTodayRecords([]);
+      return;
+    }
+    const fetchTodayRecords = async () => {
+      setLoadingToday(true);
+      try {
+        const today = new Date().toISOString().split("T")[0];
+        const res = await fetch(`/api/inspections?supervisor=${encodeURIComponent(supervisorName)}&date=${today}`);
+        const result = await res.json();
+        if (result.success) {
+          setTodayRecords(result.data || []);
+        }
+      } catch (err) {
+        console.error("加载今日记录失败:", err);
+      } finally {
+        setLoadingToday(false);
+      }
+    };
+    // Debounce the fetch
+    const timer = setTimeout(fetchTodayRecords, 500);
+    return () => clearTimeout(timer);
+  }, [supervisorName]);
 
   // Load existing inspection data if editing
   useEffect(() => {
@@ -140,6 +301,8 @@ export default function InspectionPage() {
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "提交失败");
 
+      clearDraft(); // Clear draft after successful submission
+      setHasUnsavedChanges(false);
       router.push(`/result/${editId || result.data.id}`);
     } catch (error) {
       alert(error instanceof Error ? error.message : "提交失败，请重试");
@@ -224,6 +387,61 @@ export default function InspectionPage() {
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all text-gray-800"
                 />
               </div>
+
+              {/* 今日检查记录 */}
+              {supervisorName.trim() && (
+                <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                  <div className="flex items-center gap-2 mb-2">
+                    <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-sm font-medium text-blue-800">我的今日检查</span>
+                    {loadingToday && (
+                      <svg className="w-3 h-3 text-blue-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                    )}
+                  </div>
+                  {!loadingToday && todayRecords.length === 0 && (
+                    <p className="text-xs text-blue-500">今天暂无检查记录，开始新的检查吧</p>
+                  )}
+                  {!loadingToday && todayRecords.length > 0 && (
+                    <div className="space-y-2">
+                      {todayRecords.map((record) => (
+                        <div
+                          key={record.id}
+                          className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-blue-100"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-gray-800 truncate">{record.store_name}</div>
+                            <div className="text-xs text-gray-400">
+                              {record.region && <span>{record.region} · </span>}
+                              <span>{record.total_score}分 · {record.rating}</span>
+                            </div>
+                          </div>
+                          <div className="flex gap-1.5 ml-2">
+                            <button
+                              onClick={() => router.push(`/result/${record.id}`)}
+                              className="px-2.5 py-1 text-xs text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 transition-colors"
+                            >
+                              查看
+                            </button>
+                            {record.edit_count === 0 && (
+                              <button
+                                onClick={() => router.push(`/?edit=${record.id}`)}
+                                className="px-2.5 py-1 text-xs text-amber-600 bg-amber-50 rounded-md hover:bg-amber-100 transition-colors"
+                              >
+                                修改
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1.5">
