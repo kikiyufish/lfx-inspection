@@ -53,8 +53,20 @@ export default function HistoryPage() {
       }
     };
 
+    // 页面可见时重新检查管理员状态（处理从其他页面返回的情况）
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkAdmin();
+      }
+    };
+
     fetchHistory();
     checkAdmin();
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, []);
 
   const filteredRecords = records.filter((r) => {
@@ -127,9 +139,11 @@ export default function HistoryPage() {
   const handleDelete = async (e: React.MouseEvent, id: number, storeName: string) => {
     e.preventDefault();
     e.stopPropagation();
+    e.nativeEvent.stopImmediatePropagation();
     if (!confirm(`确定要删除「${storeName}」的检查记录吗？此操作不可恢复！`)) {
       return;
     }
+    setDeletingId(id);
     try {
       const res = await fetch(`/api/inspections/${id}/delete`, { 
         method: "DELETE",
@@ -143,13 +157,14 @@ export default function HistoryPage() {
           next.delete(id);
           return next;
         });
-        alert("删除成功");
       } else {
         alert(result.error || "删除失败");
       }
     } catch (err) {
       console.error("删除失败:", err);
       alert("删除失败，请重试");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -344,9 +359,10 @@ export default function HistoryPage() {
                     {isAdmin && (
                       <button
                         onClick={(e) => handleDelete(e, record.id, record.store_name)}
-                        className="mt-2 w-full py-1.5 text-xs text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                        disabled={deletingId === record.id}
+                        className="mt-2 w-full py-1.5 text-xs text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
                       >
-                        删除记录
+                        {deletingId === record.id ? "删除中..." : "删除记录"}
                       </button>
                     )}
                   </div>
