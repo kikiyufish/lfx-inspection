@@ -122,7 +122,9 @@ export default function HistoryPage() {
     }
   };
 
-  const handleDelete = async (id: number, storeName: string) => {
+  const handleDelete = async (e: React.MouseEvent, id: number, storeName: string) => {
+    e.preventDefault();
+    e.stopPropagation();
     if (!confirm(`确定要删除「${storeName}」的检查记录吗？此操作不可恢复！`)) {
       return;
     }
@@ -288,7 +290,7 @@ export default function HistoryPage() {
                     </Link>
                     {isAdmin && (
                       <button
-                        onClick={() => handleDelete(record.id, record.store_name)}
+                        onClick={(e) => handleDelete(e, record.id, record.store_name)}
                         className="mt-2 w-full py-1.5 text-xs text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
                       >
                         删除记录
