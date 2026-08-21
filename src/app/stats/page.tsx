@@ -69,6 +69,8 @@ export default function StatsPage() {
   const [exportingPhotos, setExportingPhotos] = useState(false);
   const [exportingSummary, setExportingSummary] = useState(false);
   const [exportingComprehensive, setExportingComprehensive] = useState(false);
+  const [selectedStores, setSelectedStores] = useState<Set<string>>(new Set());
+  const [showStoreSelector, setShowStoreSelector] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -95,9 +97,16 @@ export default function StatsPage() {
     fetchStats();
   }, [days]);
 
+  // 获取筛选后的数据
+  const getFilteredData = () => {
+    if (selectedStores.size === 0) return fullData;
+    return fullData.filter(d => selectedStores.has(d.store_name));
+  };
+
   // 导出Excel（含照片）
   const exportToExcel = async () => {
-    if (exporting || fullData.length === 0) return;
+    const dataToExport = getFilteredData();
+    if (exporting || dataToExport.length === 0) return;
     setExporting(true);
     try {
       const ExcelJS = (await import("exceljs")).default;
@@ -162,7 +171,7 @@ export default function StatsPage() {
       });
 
       // 添加数据行
-      for (const inspection of fullData) {
+      for (const inspection of dataToExport) {
         for (const item of inspection.items) {
           const deduction = item.max_score - item.actual_score;
           // 扣分项自动生成问题记录
@@ -402,7 +411,7 @@ export default function StatsPage() {
       }
 
       // 数据行：每个门店一行
-      for (const inspection of fullData) {
+      for (const inspection of dataToExport) {
         const rowData: (string | number)[] = [
           inspection.region || "",
           inspection.store_name,
@@ -503,7 +512,12 @@ export default function StatsPage() {
       const params = new URLSearchParams({ days: String(days) });
       const res = await fetch(`/api/inspections/full?${params}`);
       const result = await res.json();
-      const inspections = result.data || [];
+      const allInspections = result.data || [];
+      
+      // 按选中门店筛选
+      const inspections = selectedStores.size > 0 
+        ? allInspections.filter((i: any) => selectedStores.has(i.store_name))
+        : allInspections;
 
       // ===== Sheet 1: 督导评分汇总 =====
       const summarySheet = workbook.addWorksheet("督导评分汇总", {
@@ -986,6 +1000,87 @@ export default function StatsPage() {
               ))}
             </div>
           </div>
+        </div>
+
+        {/* 门店选择器 */}
+        <div className="bg-white rounded-xl p-4 shadow-sm mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+              <span className="font-medium text-gray-800">选择门店</span>
+              {selectedStores.size > 0 && (
+                <span className="bg-amber-100 text-amber-700 text-xs px-2 py-0.5 rounded-full">
+                  已选 {selectedStores.size} 家
+                </span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowStoreSelector(!showStoreSelector)}
+                className="text-sm text-amber-600 hover:text-amber-700"
+              >
+                {showStoreSelector ? "收起" : "展开"}
+              </button>
+              {selectedStores.size > 0 && (
+                <button
+                  onClick={() => setSelectedStores(new Set())}
+                  className="text-sm text-gray-500 hover:text-gray-700"
+                >
+                  清除选择
+                </button>
+              )}
+            </div>
+          </div>
+          
+          {showStoreSelector && (
+            <div className="border rounded-lg p-3 max-h-60 overflow-y-auto">
+              <div className="flex items-center justify-between mb-2">
+                <button
+                  onClick={() => {
+                    const allStores = new Set(data?.storeStats?.map((s) => s.name) || []);
+                    setSelectedStores(allStores);
+                  }}
+                  className="text-xs text-amber-600 hover:text-amber-700"
+                >
+                  全选
+                </button>
+                <span className="text-xs text-gray-400">
+                  共 {data?.storeStats?.length || 0} 家门店
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {data?.storeStats?.map((store) => (
+                  <label
+                    key={store.name}
+                    className="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedStores.has(store.name)}
+                      onChange={(e) => {
+                        const newSet = new Set(selectedStores);
+                        if (e.target.checked) {
+                          newSet.add(store.name);
+                        } else {
+                          newSet.delete(store.name);
+                        }
+                        setSelectedStores(newSet);
+                      }}
+                      className="w-4 h-4 text-amber-600 rounded"
+                    />
+                    <span className="text-sm text-gray-700 truncate">{store.name}</span>
+                    <span className="text-xs text-gray-400 ml-auto">{store.avgScore}分</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {!showStoreSelector && selectedStores.size === 0 && (
+            <p className="text-xs text-gray-400">未选择门店时，导出全部数据</p>
+          )}
         </div>
 
         {/* 导出按钮 */}
