@@ -64,6 +64,7 @@ export default function InspectionPage() {
   const [todayRecords, setTodayRecords] = useState<TodayRecord[]>([]);
   const [loadingToday, setLoadingToday] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [draftInfo, setDraftInfo] = useState<DraftData | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isEditMode = !!editId;
 
@@ -112,47 +113,48 @@ export default function InspectionPage() {
     }
   }, []);
 
-  // Restore draft on mount
+  // Detect draft on mount (don't auto-restore, just mark it available)
   useEffect(() => {
-    if (editId) return; // Don't restore draft in edit mode
+    if (editId) return;
     try {
       const saved = localStorage.getItem(DRAFT_KEY);
       if (!saved) return;
       const draft: DraftData = JSON.parse(saved);
-      // Only restore if draft is from today
       const draftDate = new Date(draft.savedAt);
       const today = new Date();
       if (draftDate.toDateString() !== today.toDateString()) {
         localStorage.removeItem(DRAFT_KEY);
         return;
       }
-      // Show restore confirmation
-      const shouldRestore = confirm(
-        `发现今天 ${draftDate.getHours().toString().padStart(2, "0")}:${draftDate.getMinutes().toString().padStart(2, "0")} 保存的草稿` +
-        (draft.storeName ? `（${draft.storeName}）` : "") +
-        `\n是否恢复上次填写的内容？`
-      );
-      if (shouldRestore) {
-        setStoreName(draft.storeName || "");
-        setInspectionDate(draft.inspectionDate || new Date().toISOString().split("T")[0]);
-        setSupervisorName(draft.supervisorName || "");
-        setRegion(draft.region || "");
-        setResponsiblePerson(draft.responsiblePerson || "");
-        // Convert string keys back to number keys
-        const restoredItemData: Record<number, ItemData> = {};
-        for (const [key, value] of Object.entries(draft.itemData || {})) {
-          restoredItemData[Number(key)] = value as ItemData;
-        }
-        setItemData(restoredItemData);
-        if (draft.currentStep) setCurrentStep(draft.currentStep);
-        setHasUnsavedChanges(true);
-      } else {
-        localStorage.removeItem(DRAFT_KEY);
-      }
+      setDraftInfo(draft);
     } catch {
       // ignore parse errors
     }
   }, [editId]);
+
+  // Restore draft when user clicks the recovery button
+  const restoreDraft = useCallback(() => {
+    if (!draftInfo) return;
+    setStoreName(draftInfo.storeName || "");
+    setInspectionDate(draftInfo.inspectionDate || new Date().toISOString().split("T")[0]);
+    setSupervisorName(draftInfo.supervisorName || "");
+    setRegion(draftInfo.region || "");
+    setResponsiblePerson(draftInfo.responsiblePerson || "");
+    const restoredItemData: Record<number, ItemData> = {};
+    for (const [key, value] of Object.entries(draftInfo.itemData || {})) {
+      restoredItemData[Number(key)] = value as ItemData;
+    }
+    setItemData(restoredItemData);
+    if (draftInfo.currentStep) setCurrentStep(draftInfo.currentStep);
+    setHasUnsavedChanges(true);
+    setDraftInfo(null);
+  }, [draftInfo]);
+
+  // Discard draft
+  const discardDraft = useCallback(() => {
+    localStorage.removeItem(DRAFT_KEY);
+    setDraftInfo(null);
+  }, []);
 
   // Warn before leaving with unsaved changes
   useEffect(() => {
@@ -342,6 +344,48 @@ export default function InspectionPage() {
         </div>
 
         <div className="max-w-lg mx-auto px-4 py-6">
+          {/* 草稿恢复卡片 */}
+          {draftInfo && (
+            <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 mb-6 shadow-sm">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-bold text-amber-800">未提交的草稿</span>
+                    <span className="text-xs text-amber-500">
+                      {new Date(draftInfo.savedAt).getHours().toString().padStart(2, "0")}:
+                      {new Date(draftInfo.savedAt).getMinutes().toString().padStart(2, "0")} 保存
+                    </span>
+                  </div>
+                  {draftInfo.storeName && (
+                    <p className="text-sm text-amber-700 mb-1">门店：{draftInfo.storeName}</p>
+                  )}
+                  {draftInfo.supervisorName && (
+                    <p className="text-xs text-amber-500 mb-3">督导：{draftInfo.supervisorName}</p>
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={restoreDraft}
+                      className="px-4 py-2 bg-amber-500 text-white text-sm font-medium rounded-lg hover:bg-amber-600 active:scale-[0.98] transition-all"
+                    >
+                      继续填写
+                    </button>
+                    <button
+                      onClick={discardDraft}
+                      className="px-4 py-2 bg-white text-amber-600 text-sm font-medium rounded-lg border border-amber-200 hover:bg-amber-50 active:scale-[0.98] transition-all"
+                    >
+                      放弃草稿
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 门店信息卡片 */}
           <div className="bg-white rounded-2xl shadow-sm border border-amber-100 p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-5 flex items-center gap-2">
@@ -531,7 +575,17 @@ export default function InspectionPage() {
             返回
           </button>
           <h1 className="font-semibold text-gray-800 text-sm">{storeName}</h1>
-          <div className="text-sm text-amber-700 font-bold">{totalScore}/100</div>
+          <div className="flex items-center gap-2">
+            {hasUnsavedChanges && !isEditMode && (
+              <span className="text-[10px] text-green-500 flex items-center gap-0.5">
+                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                已保存
+              </span>
+            )}
+            <span className="text-sm text-amber-700 font-bold">{totalScore}/100</span>
+          </div>
         </div>
       </div>
 
