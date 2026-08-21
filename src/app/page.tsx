@@ -491,13 +491,33 @@ export default function InspectionPage() {
                 <label className="block text-sm font-medium text-gray-600 mb-1.5">
                   区域
                 </label>
-                <input
-                  type="text"
+                <select
                   value={region}
                   onChange={(e) => setRegion(e.target.value)}
-                  placeholder="请输入所属区域（如：青浦、徐汇等）"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all text-gray-800"
-                />
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all text-gray-800 bg-white appearance-none"
+                >
+                  <option value="">请选择区域</option>
+                  <option value="南京东路">南京东路</option>
+                  <option value="城隍庙">城隍庙</option>
+                  <option value="本部">本部</option>
+                  <option value="私洽">私洽</option>
+                  <option value="珍品">珍品</option>
+                  <option value="闵行">闵行</option>
+                  <option value="奉贤">奉贤</option>
+                  <option value="徐汇">徐汇</option>
+                  <option value="静安">静安</option>
+                  <option value="松江">松江</option>
+                  <option value="杨浦虹口">杨浦虹口</option>
+                  <option value="长宁普陀">长宁普陀</option>
+                  <option value="浦东1">浦东1</option>
+                  <option value="浦东2">浦东2</option>
+                  <option value="浦东3">浦东3</option>
+                  <option value="宝山">宝山</option>
+                  <option value="嘉定">嘉定</option>
+                  <option value="崇明">崇明</option>
+                  <option value="青浦">青浦</option>
+                  <option value="金山">金山</option>
+                </select>
               </div>
 
               <div>
