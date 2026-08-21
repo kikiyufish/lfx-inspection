@@ -79,6 +79,24 @@ export default function ResultPage() {
     }
   };
 
+  // 导出Word报告
+  const handleExportReport = async () => {
+    try {
+      const res = await fetch(`/api/inspections/${params.id}/report`);
+      if (!res.ok) throw new Error("导出失败");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.download = `老凤祥督导巡店报表（${data?.store_name}）${data?.inspection_date}.docx`;
+      link.href = url;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("导出报告失败:", err);
+      alert("导出报告失败，请重试");
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -129,6 +147,12 @@ export default function ResultPage() {
         </Link>
         <span className="text-sm font-medium text-gray-700">检查报告</span>
         <div className="flex gap-2">
+          <button
+            onClick={handleExportReport}
+            className="text-xs px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg font-medium"
+          >
+            导出报告
+          </button>
           <button
             onClick={handleExportPDF}
             disabled={exporting}
