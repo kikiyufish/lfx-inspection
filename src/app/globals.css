@@ -154,7 +154,19 @@ body {
 
 /* 打印样式 */
 @media print {
-  .no-print {
+  .print\:hidden {
     display: none !important;
+  }
+
+  body {
+    background: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  #report-content {
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 }

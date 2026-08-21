@@ -101,8 +101,26 @@ export default function InspectionPage() {
         {/* 顶部品牌栏 */}
         <div className="bg-gradient-to-r from-amber-700 to-amber-600 text-white px-4 py-6 shadow-lg">
           <div className="max-w-lg mx-auto">
-            <h1 className="text-xl font-bold tracking-wide">老凤祥</h1>
-            <p className="text-amber-100 text-sm mt-1">督导巡店检查系统 (2026版)</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-xl font-bold tracking-wide">老凤祥</h1>
+                <p className="text-amber-100 text-sm mt-1">督导巡店检查系统 (2026版)</p>
+              </div>
+              <div className="flex gap-2">
+                <a
+                  href="/history"
+                  className="px-3 py-1.5 bg-white/15 rounded-lg text-xs font-medium hover:bg-white/25 transition-colors"
+                >
+                  历史记录
+                </a>
+                <a
+                  href="/stats"
+                  className="px-3 py-1.5 bg-white/15 rounded-lg text-xs font-medium hover:bg-white/25 transition-colors"
+                >
+                  统计报告
+                </a>
+              </div>
+            </div>
           </div>
         </div>
 

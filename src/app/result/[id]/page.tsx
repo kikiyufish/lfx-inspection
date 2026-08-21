@@ -34,6 +34,7 @@ export default function ResultPage() {
   const [data, setData] = useState<InspectionResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     const fetchResult = async () => {
@@ -50,6 +51,33 @@ export default function ResultPage() {
     };
     fetchResult();
   }, [params.id]);
+
+  const handleExportPDF = async () => {
+    if (!data) return;
+    setExporting(true);
+    try {
+      const html2canvas = (await import("html2canvas-pro")).default;
+      const element = document.getElementById("report-content");
+      if (!element) return;
+
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#f9fafb",
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+      const link = document.createElement("a");
+      link.download = `巡店报告_${data.store_name}_${data.inspection_date}.png`;
+      link.href = imgData;
+      link.click();
+    } catch (err) {
+      console.error("导出失败:", err);
+      alert("导出失败，请重试");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -78,153 +106,180 @@ export default function ResultPage() {
 
   const ratingInfo = getRatingInfo(data.total_score);
 
-  // 按分类汇总
   const categorySummary = inspectionCategories.map((cat) => {
     const catItems = data.items.filter((item) => item.category === cat.name);
     const catScore = catItems.reduce((sum, item) => sum + item.actual_score, 0);
     return { ...cat, score: catScore };
   });
 
-  // 有问题记录的项目
   const problemItems = data.items.filter(
     (item) => item.notes || (item.photo_urls && item.photo_urls.length > 0)
   );
 
   return (
     <div className="min-h-screen bg-gray-50 pb-8">
-      {/* 顶部结果展示 */}
-      <div
-        className="px-4 py-8 text-center text-white"
-        style={{
-          background: `linear-gradient(135deg, ${ratingInfo.color}dd, ${ratingInfo.color}99)`,
-        }}
-      >
-        <div className="max-w-lg mx-auto">
-          <div className="text-5xl font-bold mb-2">{data.total_score}</div>
-          <div className="text-xl font-semibold mb-1">{ratingInfo.label}</div>
-          <p className="text-white/80 text-sm">{ratingInfo.description}</p>
+      {/* 操作栏 - 打印时隐藏 */}
+      <div className="print:hidden sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 px-4 py-2.5 flex items-center justify-between">
+        <Link href="/" className="flex items-center gap-1 text-gray-600 text-sm">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          返回
+        </Link>
+        <span className="text-sm font-medium text-gray-700">检查报告</span>
+        <div className="flex gap-2">
+          <button
+            onClick={handleExportPDF}
+            disabled={exporting}
+            className="text-xs px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg font-medium disabled:opacity-50"
+          >
+            {exporting ? "导出中..." : "导出图片"}
+          </button>
+          <button
+            onClick={() => window.print()}
+            className="text-xs px-3 py-1.5 bg-gray-100 text-gray-600 rounded-lg font-medium"
+          >
+            打印
+          </button>
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 -mt-4">
-        {/* 基本信息卡片 */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4">
-          <h3 className="font-semibold text-gray-800 mb-3">检查信息</h3>
-          <div className="space-y-2.5">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">门店名称</span>
-              <span className="text-gray-800 font-medium">{data.store_name}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">检查日期</span>
-              <span className="text-gray-800 font-medium">{data.inspection_date}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">督导姓名</span>
-              <span className="text-gray-800 font-medium">{data.supervisor_name}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-500">提交时间</span>
-              <span className="text-gray-800 font-medium">
-                {new Date(data.created_at).toLocaleString("zh-CN")}
-              </span>
-            </div>
+      {/* 报告内容区域 - 用于导出 */}
+      <div id="report-content">
+        {/* 顶部结果展示 */}
+        <div
+          className="px-4 py-8 text-center text-white"
+          style={{
+            background: `linear-gradient(135deg, ${ratingInfo.color}dd, ${ratingInfo.color}99)`,
+          }}
+        >
+          <div className="max-w-lg mx-auto">
+            <div className="text-5xl font-bold mb-2">{data.total_score}</div>
+            <div className="text-xl font-semibold mb-1">{ratingInfo.label}</div>
+            <p className="text-white/80 text-sm">{ratingInfo.description}</p>
           </div>
         </div>
 
-        {/* 分类得分 */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4">
-          <h3 className="font-semibold text-gray-800 mb-3">分类得分</h3>
-          <div className="space-y-3">
-            {categorySummary.map((cat) => (
-              <div key={cat.id}>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-600">{cat.name}</span>
-                  <span className="font-medium text-gray-800">
-                    {cat.score}/{cat.maxScore}
-                  </span>
-                </div>
-                <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-700"
-                    style={{
-                      width: `${cat.maxScore > 0 ? (cat.score / cat.maxScore) * 100 : 0}%`,
-                      backgroundColor:
-                        cat.score / cat.maxScore >= 0.8
-                          ? "#10b981"
-                          : cat.score / cat.maxScore >= 0.5
-                          ? "#f59e0b"
-                          : "#ef4444",
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* 问题记录 */}
-        {problemItems.length > 0 && (
+        <div className="max-w-lg mx-auto px-4 -mt-4">
+          {/* 基本信息卡片 */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4">
-            <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
-              <span className="w-2 h-2 bg-red-500 rounded-full" />
-              问题记录 ({problemItems.length}项)
-            </h3>
-            <div className="space-y-4">
-              {problemItems.map((item) => (
-                <div key={item.id} className="border-l-2 border-amber-300 pl-3">
-                  <div className="flex items-start gap-2 mb-1">
-                    <span className="shrink-0 w-5 h-5 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center text-[10px] font-bold mt-0.5">
-                      {item.item_number}
+            <h3 className="font-semibold text-gray-800 mb-3">检查信息</h3>
+            <div className="space-y-2.5">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">门店名称</span>
+                <span className="text-gray-800 font-medium">{data.store_name}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">检查日期</span>
+                <span className="text-gray-800 font-medium">{data.inspection_date}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">督导姓名</span>
+                <span className="text-gray-800 font-medium">{data.supervisor_name}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">提交时间</span>
+                <span className="text-gray-800 font-medium">
+                  {new Date(data.created_at).toLocaleString("zh-CN")}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* 分类得分 */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4">
+            <h3 className="font-semibold text-gray-800 mb-3">分类得分</h3>
+            <div className="space-y-3">
+              {categorySummary.map((cat) => (
+                <div key={cat.id}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-gray-600">{cat.name}</span>
+                    <span className="font-medium text-gray-800">
+                      {cat.score}/{cat.maxScore}
                     </span>
-                    <p className="text-sm text-gray-700 leading-relaxed">
-                      {item.description}
-                    </p>
                   </div>
-                  <div className="ml-7">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-medium text-amber-700">
-                        得分: {item.actual_score}/{item.max_score}
-                      </span>
-                    </div>
-                    {item.notes && (
-                      <p className="text-sm text-gray-600 bg-gray-50 rounded-lg p-2 mb-2">
-                        {item.notes}
-                      </p>
-                    )}
-                    {item.photo_urls && item.photo_urls.length > 0 && (
-                      <div className="flex flex-wrap gap-2">
-                        {item.photo_urls.map((url, idx) => (
-                          <img
-                            key={idx}
-                            src={url}
-                            alt={`问题照片${idx + 1}`}
-                            className="w-16 h-16 object-cover rounded-lg border border-gray-200"
-                          />
-                        ))}
-                      </div>
-                    )}
+                  <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{
+                        width: `${cat.maxScore > 0 ? (cat.score / cat.maxScore) * 100 : 0}%`,
+                        backgroundColor:
+                          cat.score / cat.maxScore >= 0.8
+                            ? "#10b981"
+                            : cat.score / cat.maxScore >= 0.5
+                            ? "#f59e0b"
+                            : "#ef4444",
+                      }}
+                    />
                   </div>
                 </div>
               ))}
             </div>
           </div>
-        )}
 
-        {/* 操作按钮 */}
-        <div className="flex gap-3 mt-6">
-          <Link
-            href="/"
-            className="flex-1 py-3 text-center border border-gray-200 text-gray-600 font-medium rounded-xl hover:bg-gray-50 transition-colors"
-          >
-            新建检查
-          </Link>
-          <button
-            onClick={() => window.print()}
-            className="flex-1 py-3 bg-gradient-to-r from-amber-600 to-amber-500 text-white font-semibold rounded-xl shadow-lg shadow-amber-200 active:scale-[0.98] transition-transform"
-          >
-            打印报告
-          </button>
+          {/* 问题记录 */}
+          {problemItems.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 mb-4">
+              <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <span className="w-2 h-2 bg-red-500 rounded-full" />
+                问题记录 ({problemItems.length}项)
+              </h3>
+              <div className="space-y-4">
+                {problemItems.map((item) => (
+                  <div key={item.id} className="border-l-2 border-amber-300 pl-3">
+                    <div className="flex items-start gap-2 mb-1">
+                      <span className="shrink-0 w-5 h-5 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center text-[10px] font-bold mt-0.5">
+                        {item.item_number}
+                      </span>
+                      <p className="text-sm text-gray-700 leading-relaxed">
+                        {item.description}
+                      </p>
+                    </div>
+                    <div className="ml-7">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-medium text-amber-700">
+                          得分: {item.actual_score}/{item.max_score}
+                        </span>
+                      </div>
+                      {item.notes && (
+                        <p className="text-sm text-gray-600 bg-gray-50 rounded-lg p-2 mb-2">
+                          {item.notes}
+                        </p>
+                      )}
+                      {item.photo_urls && item.photo_urls.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {item.photo_urls.map((url, idx) => (
+                            <img
+                              key={idx}
+                              src={url}
+                              alt={`问题照片${idx + 1}`}
+                              className="w-16 h-16 object-cover rounded-lg border border-gray-200"
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 操作按钮 - 打印时隐藏 */}
+          <div className="flex gap-3 mt-6 print:hidden">
+            <Link
+              href="/"
+              className="flex-1 py-3 text-center border border-gray-200 text-gray-600 font-medium rounded-xl hover:bg-gray-50 transition-colors"
+            >
+              新建检查
+            </Link>
+            <Link
+              href="/history"
+              className="flex-1 py-3 text-center border border-amber-200 text-amber-700 font-medium rounded-xl hover:bg-amber-50 transition-colors"
+            >
+              历史记录
+            </Link>
+          </div>
         </div>
       </div>
     </div>

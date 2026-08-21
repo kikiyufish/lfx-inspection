@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseClient } from "@/storage/database/supabase-client";
 
+export const dynamic = "force-dynamic";
+
 // POST - 创建新的巡店检查记录
 export async function POST(request: NextRequest) {
   try {
