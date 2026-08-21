@@ -1,22 +1,20 @@
 // 管理员配置
-// 实际使用时应通过环境变量配置，这里作为示例
 export interface Admin {
   username: string;
   password: string;
   name: string;
 }
 
-// 从环境变量读取管理员配置，如果没有则使用默认值
 export const ADMINS: Admin[] = [
   {
-    username: process.env.ADMIN1_USERNAME || 'admin1',
-    password: process.env.ADMIN1_PASSWORD || 'lfx2026admin1',
-    name: process.env.ADMIN1_NAME || '管理员1',
+    username: 'admin1',
+    password: 'lfx2026',
+    name: '管理员1',
   },
   {
-    username: process.env.ADMIN2_USERNAME || 'admin2',
-    password: process.env.ADMIN2_PASSWORD || 'lfx2026admin2',
-    name: process.env.ADMIN2_NAME || '管理员2',
+    username: 'admin2',
+    password: 'lfx2026',
+    name: '管理员2',
   },
 ];
 
