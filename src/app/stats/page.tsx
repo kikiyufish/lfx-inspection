@@ -290,116 +290,173 @@ export default function StatsPage() {
         });
       });
 
-      // Sheet 3: 问题汇总（只展示扣分项）
-      const problemSheet = workbook.addWorksheet("问题汇总");
-      problemSheet.columns = [
-        { header: "门店名称", key: "store", width: 18 },
-        { header: "检查日期", key: "date", width: 12 },
-        { header: "督导", key: "supervisor", width: 10 },
-        { header: "检查大类", key: "category", width: 14 },
-        { header: "序号", key: "num", width: 6 },
-        { header: "检查项目及标准", key: "desc", width: 45 },
-        { header: "满分", key: "max", width: 6 },
-        { header: "得分", key: "score", width: 6 },
-        { header: "扣分", key: "deduction", width: 6 },
-        { header: "问题记录", key: "notes", width: 35 },
-        { header: "现场照片", key: "photos", width: 25 },
-      ];
-
-      // 问题汇总标题
-      const problemTitle = problemSheet.addRow(["老凤祥督导巡店 - 问题汇总"]);
-      problemTitle.font = { size: 14, bold: true, color: { argb: "FFDC2626" } };
-      problemTitle.alignment = { horizontal: "center" };
-      problemSheet.mergeCells(1, 1, 1, 11);
-
-      const problemSubtitle = problemSheet.addRow([
-        `统计周期: 近${days}天 | 共${fullData.filter(d => d.items.some(i => i.actual_score < i.max_score)).length}次检查存在问题`,
-      ]);
-      problemSubtitle.font = { size: 10, color: { argb: "FF666666" } };
-      problemSubtitle.alignment = { horizontal: "center" };
-      problemSheet.mergeCells(2, 1, 2, 11);
-
-      // 问题汇总表头
-      const problemHeader = problemSheet.addRow([
-        "门店名称", "检查日期", "督导", "检查大类", "序号",
-        "检查项目及标准", "满分", "得分", "扣分", "问题记录", "现场照片",
-      ]);
-      problemHeader.eachCell((cell) => {
-        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
-        cell.fill = {
-          type: "pattern",
-          pattern: "solid",
-          fgColor: { argb: "FFDC2626" },
-        };
-        cell.alignment = { horizontal: "center", vertical: "middle" };
+      // Sheet 3: 问题汇总（矩阵格式，参照模板）
+      const problemSheet = workbook.addWorksheet("问题汇总", {
+        views: [{ state: "frozen", ySplit: 4, xSplit: 4 }],
       });
 
-      // 只添加扣分项
-      let problemCount = 0;
-      for (const inspection of fullData) {
-        for (const item of inspection.items) {
-          const deduction = item.max_score - item.actual_score;
-          if (deduction > 0) {
-            problemCount++;
-            const autoNotes = !item.notes
-              ? `扣${deduction}分，需整改`
-              : item.notes;
-            const row = problemSheet.addRow({
-              store: inspection.store_name,
-              date: inspection.inspection_date,
-              supervisor: inspection.supervisor_name,
-              category: item.category,
-              num: item.item_number,
-              desc: item.description,
-              max: item.max_score,
-              score: item.actual_score,
-              deduction: deduction,
-              notes: autoNotes,
-              photos: item.photo_urls.length > 0 ? `[${item.photo_urls.length}张照片]` : "",
-            });
+      // 定义分类和检查项
+      const categories = [
+        { name: "一、基础管理（20分）", items: [1, 2, 3, 4, 5] },
+        { name: "二、环境与设施（10分）", items: [6, 7, 8, 9] },
+        { name: "三、货品管理（30分）", items: [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20] },
+        { name: "四、安全管理（20分）", items: [21, 22, 23, 24, 25, 26] },
+        { name: "五、财务管理（10分）", items: [27, 28, 29, 30] },
+        { name: "六、服务与售后（10分）", items: [31, 32, 33, 34, 35] },
+      ];
 
-            // 扣分红色高亮
-            row.getCell("deduction").font = { color: { argb: "FFDC2626" }, bold: true };
-            row.getCell("score").font = { color: { argb: "FFDC2626" }, bold: true };
-            row.eachCell((cell) => {
-              cell.border = {
-                top: { style: "thin", color: { argb: "FFE5E7EB" } },
-                bottom: { style: "thin", color: { argb: "FFE5E7EB" } },
-                left: { style: "thin", color: { argb: "FFE5E7EB" } },
-                right: { style: "thin", color: { argb: "FFE5E7EB" } },
-              };
-              cell.alignment = { vertical: "middle", wrapText: true };
-            });
-
-            // 嵌入照片到问题汇总
-            if (item.photo_urls.length > 0) {
-              try {
-                const photoCell = row.getCell("photos");
-                photoCell.value = "";
-                const response = await fetch(item.photo_urls[0]);
-                const arrayBuffer = await response.arrayBuffer();
-                const base64 = btoa(
-                  new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), "")
-                );
-                const imageId = workbook.addImage({
-                  base64: base64,
-                  extension: "jpeg",
-                });
-                problemSheet.addImage(imageId, {
-                  tl: { col: 10.1, row: row.number - 1.9 },
-                  ext: { width: 100, height: 75 },
-                });
-              } catch (e) {
-                console.warn("嵌入照片失败:", e);
-              }
-            }
-          }
+      // 从第一个检查记录获取检查项描述
+      const itemDescriptions: Record<number, string> = {};
+      const itemMaxScores: Record<number, number> = {};
+      if (fullData.length > 0) {
+        for (const item of fullData[0].items) {
+          itemDescriptions[item.item_number] = item.description;
+          itemMaxScores[item.item_number] = item.max_score;
         }
       }
 
-      // 如果没有问题项，添加提示
-      if (problemCount === 0) {
-        problemSheet.addRow(["", "", "", "", "", "所有检查项均满分，无扣分项", "", "", "", "", ""]);
+      // Row 1: 分类标题行
+      const catRowValues: (string | number)[] = ["", "", "", ""];
+      for (const cat of categories) {
+        for (let i = 0; i < cat.items.length; i++) {
+          catRowValues.push("");
+        }
+      }
+      const catRow = problemSheet.addRow(catRowValues);
+      // 合并分类标题
+      let colOffset = 5;
+      for (const cat of categories) {
+        const colEnd = colOffset + cat.items.length - 1;
+        problemSheet.mergeCells(1, colOffset, 1, colEnd);
+        const cell = problemSheet.getCell(1, colOffset);
+        cell.value = cat.name;
+        cell.font = { bold: true, size: 11, color: { argb: "FF1F2937" } };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF3F4F6" } };
+        colOffset = colEnd + 1;
+      }
+
+      // Row 2: 编号行
+      const numRowValues: (string | number)[] = ["", "", "", ""];
+      for (let i = 1; i <= 35; i++) {
+        numRowValues.push(i);
+      }
+      const numRow = problemSheet.addRow(numRowValues);
+      for (let col = 5; col <= 39; col++) {
+        const cell = problemSheet.getCell(2, col);
+        cell.font = { bold: true, size: 9, color: { argb: "FF6B7280" } };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF9FAFB" } };
+      }
+
+      // Row 3: 检查项内容行
+      const descRowValues: (string | number)[] = ["", "", "", ""];
+      for (let i = 1; i <= 35; i++) {
+        const desc = itemDescriptions[i] || "";
+        const maxScore = itemMaxScores[i] || 0;
+        descRowValues.push(`${desc}（${maxScore}分）`);
+      }
+      const descRow = problemSheet.addRow(descRowValues);
+      for (let col = 5; col <= 39; col++) {
+        const cell = problemSheet.getCell(3, col);
+        cell.font = { size: 8, color: { argb: "FF6B7280" } };
+        cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF9FAFB" } };
+      }
+
+      // Row 4: 表头行
+      const probHeaderValues: (string | number)[] = ["店铺名", "责任人", "日期", "得分"];
+      for (let i = 1; i <= 35; i++) {
+        probHeaderValues.push("");
+      }
+      const probHeaderRow = problemSheet.addRow(probHeaderValues);
+      for (let col = 1; col <= 4; col++) {
+        const cell = probHeaderRow.getCell(col);
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFB91C1C" } };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.border = {
+          top: { style: "thin", color: { argb: "FF991B1B" } },
+          bottom: { style: "thin", color: { argb: "FF991B1B" } },
+          left: { style: "thin", color: { argb: "FF991B1B" } },
+          right: { style: "thin", color: { argb: "FF991B1B" } },
+        };
+      }
+
+      // 设置列宽
+      problemSheet.getColumn(1).width = 18;
+      problemSheet.getColumn(2).width = 10;
+      problemSheet.getColumn(3).width = 12;
+      problemSheet.getColumn(4).width = 8;
+      for (let col = 5; col <= 39; col++) {
+        problemSheet.getColumn(col).width = 22;
+      }
+
+      // 数据行：每个门店一行
+      for (const inspection of fullData) {
+        const rowData: (string | number)[] = [
+          inspection.store_name,
+          inspection.supervisor_name,
+          inspection.inspection_date,
+          inspection.total_score,
+        ];
+
+        // 填充35个检查项的问题描述
+        for (let itemNum = 1; itemNum <= 35; itemNum++) {
+          const item = inspection.items.find(i => i.item_number === itemNum);
+          if (item) {
+            const deduction = item.max_score - item.actual_score;
+            const hasNotes = item.notes && item.notes.trim().length > 0;
+            if (deduction > 0 || hasNotes) {
+              // 有扣分或有备注的项，显示问题描述
+              let cellText = "";
+              if (deduction > 0 && hasNotes) {
+                cellText = `${item.notes}-${deduction}`;
+              } else if (deduction > 0) {
+                cellText = `扣${deduction}分`;
+              } else {
+                // 满分但有备注
+                cellText = item.notes || "";
+              }
+              rowData.push(cellText);
+            } else {
+              rowData.push("");
+            }
+          } else {
+            rowData.push("");
+          }
+        }
+
+        const row = problemSheet.addRow(rowData);
+        // 设置样式
+        for (let col = 1; col <= 4; col++) {
+          const cell = row.getCell(col);
+          cell.alignment = { horizontal: "center", vertical: "middle" };
+          cell.border = {
+            top: { style: "thin", color: { argb: "FFE5E7EB" } },
+            bottom: { style: "thin", color: { argb: "FFE5E7EB" } },
+            left: { style: "thin", color: { argb: "FFE5E7EB" } },
+            right: { style: "thin", color: { argb: "FFE5E7EB" } },
+          };
+        }
+        // 得分列红色高亮（如果低于100）
+        if (inspection.total_score < 100) {
+          row.getCell(4).font = { color: { argb: "FFDC2626" }, bold: true };
+        }
+        // 问题项红色字体
+        for (let col = 5; col <= 39; col++) {
+          const cell = row.getCell(col);
+          cell.alignment = { vertical: "middle", wrapText: true };
+          cell.border = {
+            top: { style: "thin", color: { argb: "FFE5E7EB" } },
+            bottom: { style: "thin", color: { argb: "FFE5E7EB" } },
+            left: { style: "thin", color: { argb: "FFE5E7EB" } },
+            right: { style: "thin", color: { argb: "FFE5E7EB" } },
+          };
+          if (cell.value && String(cell.value).trim()) {
+            cell.font = { color: { argb: "FFDC2626" }, size: 9 };
+          }
+        }
       }
 
       // 生成文件并下载

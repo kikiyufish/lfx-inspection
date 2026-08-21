@@ -112,9 +112,9 @@ export default function ResultPage() {
     return { ...cat, score: catScore };
   });
 
-  // 所有扣分的检查项都作为问题记录
+  // 问题记录：只列出有扣分的或有填写备注的检查项
   const problemItems = data.items.filter(
-    (item) => item.actual_score < item.max_score
+    (item) => item.actual_score < item.max_score || (item.notes && item.notes.trim())
   );
 
   return (
@@ -238,9 +238,15 @@ export default function ResultPage() {
                     </div>
                     <div className="ml-7">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-medium text-red-600">
-                          扣{item.max_score - item.actual_score}分
-                        </span>
+                        {item.actual_score < item.max_score ? (
+                          <span className="text-xs font-medium text-red-600">
+                            扣{item.max_score - item.actual_score}分
+                          </span>
+                        ) : (
+                          <span className="text-xs font-medium text-amber-600">
+                            满分 (有备注)
+                          </span>
+                        )}
                         <span className="text-xs text-gray-400">
                           (得分 {item.actual_score}/{item.max_score})
                         </span>
