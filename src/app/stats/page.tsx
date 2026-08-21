@@ -115,6 +115,7 @@ export default function StatsPage() {
         { header: "检查项目及标准", key: "desc", width: 45 },
         { header: "满分", key: "max", width: 6 },
         { header: "得分", key: "score", width: 6 },
+        { header: "扣分", key: "deduction", width: 6 },
         { header: "问题记录", key: "notes", width: 30 },
         { header: "现场照片", key: "photos", width: 25 },
       ];
@@ -123,19 +124,19 @@ export default function StatsPage() {
       const titleRow = detailSheet.addRow(["老凤祥督导巡店检查报告"]);
       titleRow.font = { size: 16, bold: true, color: { argb: "FFB45515" } };
       titleRow.alignment = { horizontal: "center" };
-      detailSheet.mergeCells(1, 1, 1, 10);
+      detailSheet.mergeCells(1, 1, 1, 11);
 
       const subtitleRow = detailSheet.addRow([
         `统计周期: 近${days}天 | 导出时间: ${new Date().toLocaleString("zh-CN")}`,
       ]);
       subtitleRow.font = { size: 10, color: { argb: "FF666666" } };
       subtitleRow.alignment = { horizontal: "center" };
-      detailSheet.mergeCells(2, 1, 2, 10);
+      detailSheet.mergeCells(2, 1, 2, 11);
 
       // 表头行
       const headerRow = detailSheet.addRow([
         "门店名称", "检查日期", "督导", "检查大类", "序号",
-        "检查项目及标准", "满分", "得分", "问题记录", "现场照片",
+        "检查项目及标准", "满分", "得分", "扣分", "问题记录", "现场照片",
       ]);
       headerRow.eachCell((cell) => {
         cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
@@ -156,6 +157,11 @@ export default function StatsPage() {
       // 添加数据行
       for (const inspection of fullData) {
         for (const item of inspection.items) {
+          const deduction = item.max_score - item.actual_score;
+          // 扣分项自动生成问题记录
+          const autoNotes = deduction > 0 && !item.notes
+            ? `扣${deduction}分，需整改`
+            : item.notes || "";
           const row = detailSheet.addRow({
             store: inspection.store_name,
             date: inspection.inspection_date,
@@ -165,7 +171,8 @@ export default function StatsPage() {
             desc: item.description,
             max: item.max_score,
             score: item.actual_score,
-            notes: item.notes || "",
+            deduction: deduction > 0 ? deduction : "",
+            notes: autoNotes,
             photos: item.photo_urls.length > 0 ? `[${item.photo_urls.length}张照片]` : "",
           });
 
@@ -178,6 +185,20 @@ export default function StatsPage() {
             scoreCell.font = { color: { argb: "FFCA8A04" }, bold: true };
           } else {
             scoreCell.font = { color: { argb: "FFDC2626" }, bold: true };
+          }
+
+          // 扣分列红色高亮
+          if (deduction > 0) {
+            const deductionCell = row.getCell("deduction");
+            deductionCell.font = { color: { argb: "FFDC2626" }, bold: true };
+            // 扣分行背景浅红
+            row.eachCell((cell) => {
+              cell.fill = {
+                type: "pattern",
+                pattern: "solid",
+                fgColor: { argb: "FFFEF2F2" },
+              };
+            });
           }
 
           // 边框
@@ -221,7 +242,7 @@ export default function StatsPage() {
                 extension: "jpeg",
               });
               detailSheet.addImage(imageId, {
-                tl: { col: 9.1, row: row.number - 1.9 },
+                tl: { col: 10.1, row: row.number - 1.9 },
                 ext: { width: 100, height: 75 },
               });
             } catch (e) {
@@ -268,6 +289,118 @@ export default function StatsPage() {
           value: `${s.name} / ${s.count}次 / ${s.avgScore}分`,
         });
       });
+
+      // Sheet 3: 问题汇总（只展示扣分项）
+      const problemSheet = workbook.addWorksheet("问题汇总");
+      problemSheet.columns = [
+        { header: "门店名称", key: "store", width: 18 },
+        { header: "检查日期", key: "date", width: 12 },
+        { header: "督导", key: "supervisor", width: 10 },
+        { header: "检查大类", key: "category", width: 14 },
+        { header: "序号", key: "num", width: 6 },
+        { header: "检查项目及标准", key: "desc", width: 45 },
+        { header: "满分", key: "max", width: 6 },
+        { header: "得分", key: "score", width: 6 },
+        { header: "扣分", key: "deduction", width: 6 },
+        { header: "问题记录", key: "notes", width: 35 },
+        { header: "现场照片", key: "photos", width: 25 },
+      ];
+
+      // 问题汇总标题
+      const problemTitle = problemSheet.addRow(["老凤祥督导巡店 - 问题汇总"]);
+      problemTitle.font = { size: 14, bold: true, color: { argb: "FFDC2626" } };
+      problemTitle.alignment = { horizontal: "center" };
+      problemSheet.mergeCells(1, 1, 1, 11);
+
+      const problemSubtitle = problemSheet.addRow([
+        `统计周期: 近${days}天 | 共${fullData.filter(d => d.items.some(i => i.actual_score < i.max_score)).length}次检查存在问题`,
+      ]);
+      problemSubtitle.font = { size: 10, color: { argb: "FF666666" } };
+      problemSubtitle.alignment = { horizontal: "center" };
+      problemSheet.mergeCells(2, 1, 2, 11);
+
+      // 问题汇总表头
+      const problemHeader = problemSheet.addRow([
+        "门店名称", "检查日期", "督导", "检查大类", "序号",
+        "检查项目及标准", "满分", "得分", "扣分", "问题记录", "现场照片",
+      ]);
+      problemHeader.eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        cell.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFDC2626" },
+        };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+      });
+
+      // 只添加扣分项
+      let problemCount = 0;
+      for (const inspection of fullData) {
+        for (const item of inspection.items) {
+          const deduction = item.max_score - item.actual_score;
+          if (deduction > 0) {
+            problemCount++;
+            const autoNotes = !item.notes
+              ? `扣${deduction}分，需整改`
+              : item.notes;
+            const row = problemSheet.addRow({
+              store: inspection.store_name,
+              date: inspection.inspection_date,
+              supervisor: inspection.supervisor_name,
+              category: item.category,
+              num: item.item_number,
+              desc: item.description,
+              max: item.max_score,
+              score: item.actual_score,
+              deduction: deduction,
+              notes: autoNotes,
+              photos: item.photo_urls.length > 0 ? `[${item.photo_urls.length}张照片]` : "",
+            });
+
+            // 扣分红色高亮
+            row.getCell("deduction").font = { color: { argb: "FFDC2626" }, bold: true };
+            row.getCell("score").font = { color: { argb: "FFDC2626" }, bold: true };
+            row.eachCell((cell) => {
+              cell.border = {
+                top: { style: "thin", color: { argb: "FFE5E7EB" } },
+                bottom: { style: "thin", color: { argb: "FFE5E7EB" } },
+                left: { style: "thin", color: { argb: "FFE5E7EB" } },
+                right: { style: "thin", color: { argb: "FFE5E7EB" } },
+              };
+              cell.alignment = { vertical: "middle", wrapText: true };
+            });
+
+            // 嵌入照片到问题汇总
+            if (item.photo_urls.length > 0) {
+              try {
+                const photoCell = row.getCell("photos");
+                photoCell.value = "";
+                const response = await fetch(item.photo_urls[0]);
+                const arrayBuffer = await response.arrayBuffer();
+                const base64 = btoa(
+                  new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), "")
+                );
+                const imageId = workbook.addImage({
+                  base64: base64,
+                  extension: "jpeg",
+                });
+                problemSheet.addImage(imageId, {
+                  tl: { col: 10.1, row: row.number - 1.9 },
+                  ext: { width: 100, height: 75 },
+                });
+              } catch (e) {
+                console.warn("嵌入照片失败:", e);
+              }
+            }
+          }
+        }
+      }
+
+      // 如果没有问题项，添加提示
+      if (problemCount === 0) {
+        problemSheet.addRow(["", "", "", "", "", "所有检查项均满分，无扣分项", "", "", "", "", ""]);
+      }
 
       // 生成文件并下载
       const buffer = await workbook.xlsx.writeBuffer();

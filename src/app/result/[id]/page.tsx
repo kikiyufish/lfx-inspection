@@ -112,8 +112,9 @@ export default function ResultPage() {
     return { ...cat, score: catScore };
   });
 
+  // 所有扣分的检查项都作为问题记录
   const problemItems = data.items.filter(
-    (item) => item.notes || (item.photo_urls && item.photo_urls.length > 0)
+    (item) => item.actual_score < item.max_score
   );
 
   return (
@@ -237,13 +238,21 @@ export default function ResultPage() {
                     </div>
                     <div className="ml-7">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-medium text-amber-700">
-                          得分: {item.actual_score}/{item.max_score}
+                        <span className="text-xs font-medium text-red-600">
+                          扣{item.max_score - item.actual_score}分
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          (得分 {item.actual_score}/{item.max_score})
                         </span>
                       </div>
                       {item.notes && (
                         <p className="text-sm text-gray-600 bg-gray-50 rounded-lg p-2 mb-2">
                           {item.notes}
+                        </p>
+                      )}
+                      {!item.notes && (
+                        <p className="text-sm text-gray-400 italic mb-2">
+                          未填写问题描述
                         </p>
                       )}
                       {item.photo_urls && item.photo_urls.length > 0 && (
