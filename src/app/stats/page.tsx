@@ -87,8 +87,8 @@ export default function StatsPage() {
   const { summary, storeStats, trendData, recentRecords } = data;
   const total = summary.ratingDistribution.excellent + summary.ratingDistribution.good + summary.ratingDistribution.poor;
 
-  // 导出Excel
-  const exportToExcel = () => {
+  // 导出Excel（含详细检查项）
+  const exportToExcel = async () => {
     const wb = XLSX.utils.book_new();
 
     // Sheet 1: 概览统计
@@ -136,10 +136,10 @@ export default function StatsPage() {
     ws3["!cols"] = [{ wch: 12 }, { wch: 10 }, { wch: 10 }];
     XLSX.utils.book_append_sheet(wb, ws3, "评分趋势");
 
-    // Sheet 4: 检查明细
-    const detailData = [
-      ["检查记录明细"],
-      ["序号", "门店名称", "检查日期", "督导", "得分", "评级"],
+    // Sheet 4: 检查记录汇总
+    const recordData = [
+      ["检查记录汇总"],
+      ["序号", "门店名称", "检查日期", "督导", "总分", "评级"],
       ...recentRecords.map((r, i) => [
         i + 1,
         r.store_name,
@@ -149,13 +149,59 @@ export default function StatsPage() {
         r.rating,
       ]),
     ];
-    const ws4 = XLSX.utils.aoa_to_sheet(detailData);
+    const ws4 = XLSX.utils.aoa_to_sheet(recordData);
     ws4["!cols"] = [{ wch: 6 }, { wch: 20 }, { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 8 }];
-    XLSX.utils.book_append_sheet(wb, ws4, "检查明细");
+    XLSX.utils.book_append_sheet(wb, ws4, "检查记录汇总");
 
-    // 下载
-    const filename = `巡店统计报告_${new Date().toISOString().slice(0, 10)}.xlsx`;
-    XLSX.writeFile(wb, filename);
+    // Sheet 5: 每项检查明细（详细列出所有35项）
+    const detailData = [
+      ["检查项明细"],
+      ["检查ID", "门店名称", "检查日期", "督导", "检查大类", "序号", "检查项目及标准", "满分", "得分", "问题记录"],
+    ];
+
+    // 逐条获取检查记录的详细项
+    try {
+      for (const record of recentRecords) {
+        const res = await fetch(`/api/inspections/${record.id}`);
+        const json = await res.json();
+        if (json.success && json.data.items) {
+          for (const item of json.data.items) {
+            detailData.push([
+              record.id,
+              record.store_name,
+              record.inspection_date,
+              record.supervisor_name,
+              item.category || "",
+              item.item_number || "",
+              item.description || "",
+              item.max_score ?? "",
+              item.actual_score ?? "",
+              item.notes || "",
+            ]);
+          }
+        }
+      }
+    } catch (e) {
+      console.error("获取检查明细失败:", e);
+    }
+
+    const ws5 = XLSX.utils.aoa_to_sheet(detailData);
+    ws5["!cols"] = [
+      { wch: 8 },
+      { wch: 20 },
+      { wch: 12 },
+      { wch: 10 },
+      { wch: 12 },
+      { wch: 6 },
+      { wch: 40 },
+      { wch: 6 },
+      { wch: 6 },
+      { wch: 30 },
+    ];
+    XLSX.utils.book_append_sheet(wb, ws5, "检查项明细");
+
+    const dateStr = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `巡店统计报告_${dateStr}.xlsx`);
   };
 
   return (
