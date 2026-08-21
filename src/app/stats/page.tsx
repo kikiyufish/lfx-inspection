@@ -2,7 +2,16 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import * as XLSX from "xlsx";
+
+// 动态导入xlsx，确保只在客户端加载
+let XLSX: typeof import("xlsx") | null = null;
+const loadXLSX = async () => {
+  if (!XLSX) {
+    const mod = await import("xlsx");
+    XLSX = mod;
+  }
+  return XLSX;
+};
 
 interface StatsData {
   summary: {
@@ -40,6 +49,7 @@ export default function StatsPage() {
   const [data, setData] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(30);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -89,7 +99,11 @@ export default function StatsPage() {
 
   // 导出Excel（含详细检查项）
   const exportToExcel = async () => {
-    const wb = XLSX.utils.book_new();
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const xlsx = await loadXLSX();
+      const wb = xlsx.utils.book_new();
 
     // Sheet 1: 概览统计
     const overviewData = [
@@ -105,9 +119,9 @@ export default function StatsPage() {
       ["较差次数", summary.ratingDistribution.poor],
       ["优秀率", total > 0 ? `${Math.round((summary.ratingDistribution.excellent / total) * 100)}%` : "0%"],
     ];
-    const ws1 = XLSX.utils.aoa_to_sheet(overviewData);
+    const ws1 = xlsx.utils.aoa_to_sheet(overviewData);
     ws1["!cols"] = [{ wch: 15 }, { wch: 15 }];
-    XLSX.utils.book_append_sheet(wb, ws1, "概览统计");
+    xlsx.utils.book_append_sheet(wb, ws1, "概览统计");
 
     // Sheet 2: 门店排名
     const storeData = [
@@ -118,13 +132,13 @@ export default function StatsPage() {
         s.name,
         s.count,
         s.avgScore,
-        Math.max(...s.scores),
-        Math.min(...s.scores),
+        s.scores.length > 0 ? Math.max(...s.scores) : 0,
+        s.scores.length > 0 ? Math.min(...s.scores) : 0,
       ]),
     ];
-    const ws2 = XLSX.utils.aoa_to_sheet(storeData);
+    const ws2 = xlsx.utils.aoa_to_sheet(storeData);
     ws2["!cols"] = [{ wch: 6 }, { wch: 20 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }];
-    XLSX.utils.book_append_sheet(wb, ws2, "门店排名");
+    xlsx.utils.book_append_sheet(wb, ws2, "门店排名");
 
     // Sheet 3: 评分趋势
     const trendSheetData = [
@@ -132,9 +146,9 @@ export default function StatsPage() {
       ["日期", "检查次数", "平均得分"],
       ...trendData.map((t) => [t.date, t.count, t.avgScore]),
     ];
-    const ws3 = XLSX.utils.aoa_to_sheet(trendSheetData);
+    const ws3 = xlsx.utils.aoa_to_sheet(trendSheetData);
     ws3["!cols"] = [{ wch: 12 }, { wch: 10 }, { wch: 10 }];
-    XLSX.utils.book_append_sheet(wb, ws3, "评分趋势");
+    xlsx.utils.book_append_sheet(wb, ws3, "评分趋势");
 
     // Sheet 4: 检查记录汇总
     const recordData = [
@@ -149,9 +163,9 @@ export default function StatsPage() {
         r.rating,
       ]),
     ];
-    const ws4 = XLSX.utils.aoa_to_sheet(recordData);
+    const ws4 = xlsx.utils.aoa_to_sheet(recordData);
     ws4["!cols"] = [{ wch: 6 }, { wch: 20 }, { wch: 12 }, { wch: 10 }, { wch: 8 }, { wch: 8 }];
-    XLSX.utils.book_append_sheet(wb, ws4, "检查记录汇总");
+    xlsx.utils.book_append_sheet(wb, ws4, "检查记录汇总");
 
     // Sheet 5: 每项检查明细（详细列出所有35项）
     const detailData = [
@@ -185,7 +199,7 @@ export default function StatsPage() {
       console.error("获取检查明细失败:", e);
     }
 
-    const ws5 = XLSX.utils.aoa_to_sheet(detailData);
+    const ws5 = xlsx.utils.aoa_to_sheet(detailData);
     ws5["!cols"] = [
       { wch: 8 },
       { wch: 20 },
@@ -198,10 +212,16 @@ export default function StatsPage() {
       { wch: 6 },
       { wch: 30 },
     ];
-    XLSX.utils.book_append_sheet(wb, ws5, "检查项明细");
+    xlsx.utils.book_append_sheet(wb, ws5, "检查项明细");
 
     const dateStr = new Date().toISOString().slice(0, 10);
-    XLSX.writeFile(wb, `巡店统计报告_${dateStr}.xlsx`);
+    xlsx.writeFile(wb, `巡店统计报告_${dateStr}.xlsx`);
+    } catch (err) {
+      console.error("导出Excel失败:", err);
+      alert("导出失败，请重试");
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -218,12 +238,25 @@ export default function StatsPage() {
           <h1 className="text-base font-semibold text-gray-800">统计报告</h1>
           <button
             onClick={exportToExcel}
-            className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2.5 py-1.5 rounded-lg active:bg-green-100"
+            disabled={exporting}
+            className="flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2.5 py-1.5 rounded-lg active:bg-green-100 disabled:opacity-50"
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            导出Excel
+            {exporting ? (
+              <>
+                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                导出中...
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                导出Excel
+              </>
+            )}
           </button>
         </div>
       </div>
