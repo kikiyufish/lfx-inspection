@@ -25,8 +25,8 @@ export default function AdminLoginPage() {
       const data = await res.json();
 
       if (data.success) {
-        // 使用 window.location 强制刷新页面，确保管理员状态重新检查
-        window.location.href = '/history';
+        // 使用 window.location 强制刷新页面，添加时间戳避免缓存
+        window.location.href = '/history?t=' + Date.now();
       } else {
         setError(data.error || '登录失败');
       }
