@@ -67,6 +67,8 @@ export default function StatsPage() {
   const [days, setDays] = useState(30);
   const [exporting, setExporting] = useState(false);
   const [exportingPhotos, setExportingPhotos] = useState(false);
+  const [exportingSummary, setExportingSummary] = useState(false);
+  const [exportingComprehensive, setExportingComprehensive] = useState(false);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -487,6 +489,388 @@ export default function StatsPage() {
     }
   };
 
+  // 导出综合统计报表（按模板格式）
+  const exportComprehensiveReport = async () => {
+    if (exportingComprehensive) return;
+    setExportingComprehensive(true);
+    try {
+      const ExcelJS = (await import("exceljs")).default;
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = "老凤祥督导巡店系统";
+      workbook.created = new Date();
+
+      // 获取完整数据
+      const params = new URLSearchParams({ days: String(days) });
+      const res = await fetch(`/api/inspections/full?${params}`);
+      const result = await res.json();
+      const inspections = result.data || [];
+
+      // ===== Sheet 1: 督导评分汇总 =====
+      const summarySheet = workbook.addWorksheet("督导评分汇总", {
+        views: [{ state: "frozen", ySplit: 4, xSplit: 3 }],
+      });
+
+      // 标题行
+      const titleRow = summarySheet.addRow(["老凤祥上海地区督导评分汇总表（2026版）"]);
+      summarySheet.mergeCells(1, 1, 1, 42);
+      titleRow.height = 30;
+      titleRow.eachCell((cell) => {
+        cell.font = { size: 16, bold: true };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD4AF37" } };
+      });
+
+      // 分类标题行
+      const categoryHeaders = [
+        "", "", "", "", "", "", "", "",
+        "一、基础管理（20分）", "", "", "", "",
+        "二、环境与设施（10分）", "", "", "",
+        "三、货品管理（30分）", "", "", "", "", "", "", "", "", "", "", "",
+        "四、安全管理（20分）", "", "", "", "", "",
+        "五、财务管理（10分）", "", "", "",
+        "六、服务与售后（10分）", "", "", "", "",
+      ];
+      const catRow = summarySheet.addRow(categoryHeaders);
+      catRow.height = 25;
+      catRow.eachCell((cell, colNumber) => {
+        cell.font = { bold: true, size: 10 };
+        cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF5F5F5" } };
+        cell.border = {
+          top: { style: "thin" }, bottom: { style: "thin" },
+          left: { style: "thin" }, right: { style: "thin" },
+        };
+      });
+
+      // 编号行
+      const numHeaders = ["位置", "编号", "店铺名", "区域", "区域经理", "督导", "日期", "总分"];
+      for (let i = 1; i <= 35; i++) numHeaders.push(String(i));
+      const numRow = summarySheet.addRow(numHeaders);
+      numRow.height = 20;
+      numRow.eachCell((cell) => {
+        cell.font = { bold: true, size: 9 };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8E8E8" } };
+        cell.border = {
+          top: { style: "thin" }, bottom: { style: "thin" },
+          left: { style: "thin" }, right: { style: "thin" },
+        };
+      });
+
+      // 检查项描述行
+      const descHeaders = ["", "", "", "", "", "", "", ""];
+      const descriptions = [
+        "员工仪表仪容规范，佩戴统一工号牌，精神面貌良好，健康证有效（5分）",
+        "一人一客一物，微笑招呼，规范使用托盘手套放大镜（5分）",
+        "每月职工安全生产记录卡按时填写（3分）",
+        "营业准备到位，柜台整洁无私人物品（2分）",
+        "各类培训、新品推广及工作按要求完成（5分）",
+        "店铺环境整洁，无杂物无卫生死角（2分）",
+        "售货环境清洁明亮通风，温度16-26℃（2分）",
+        "电子天平校准正常，水平仪气泡居中（3分）",
+        "服务公约、当日金价、维修价目表上墙公示（3分）",
+        "产品标签按规定串绳，陈列整齐美观（2分）",
+        "商品印记、吊牌、证书与产品相符（3分）",
+        "商品使用专用道具，防护措施到位（2分）",
+        "库存记录本规范填写，早晚签名交接双签（4分）",
+        "商品抽查任务表按时填写，双人双签（3分）",
+        "进出库记录、进销存/收付存月报表完整（4分）",
+        "截料旧金登记规范，添金调换流程规范（4分）",
+        "所有销售折扣优惠需公示（2分）",
+        "黄金类赠品做好表格登记（2分）",
+        "商品检验报告齐全，吊牌有成色记录（2分）",
+        "无不合格商品上柜（2分）",
+        "灭火器正常有效，每月检查签字（3分）",
+        "消防器材无杂物，员工知晓四防应急（3分）",
+        "保险柜开库关闭后及时锁好打乱密码（5分）",
+        "商品存放专用保险柜，双人双锁管理（5分）",
+        "红外线报警系统正常并与110联网（2分）",
+        "监控正常运行，录像保留不少于30日（2分）",
+        "每日按时解款（下限1000元），上交凭证（2分）",
+        "无坐支现金、私设小金库（3分）",
+        "销售凭证规范，加盖印记已复秤章，双签（3分）",
+        "每日销售与资金数据核对一致（2分）",
+        "营业日记规范填写，交接班内容清晰（2分）",
+        "企业微信内任务及时完成（2分）",
+        "修理售后登记完整，售后服务处理表上传（2分）",
+        "顾客财产识别验证保护到位（2分）",
+        "顾客意见簿放置到位，投诉处理闭环（2分）",
+      ];
+      for (const desc of descriptions) descHeaders.push(desc);
+      const descRow = summarySheet.addRow(descHeaders);
+      descRow.height = 60;
+      descRow.eachCell((cell, colNumber) => {
+        if (colNumber > 8) {
+          cell.font = { size: 8 };
+          cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+        }
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF5F5F5" } };
+        cell.border = {
+          top: { style: "thin" }, bottom: { style: "thin" },
+          left: { style: "thin" }, right: { style: "thin" },
+        };
+      });
+
+      // 表头行
+      const headerValues = ["位置/交通", "序号", "门店名称", "区域", "区域经理", "督导", "检查日期", "总分", ...Array(35).fill("问题记录/扣分")];
+      const dataHeaderRow = summarySheet.addRow(headerValues);
+      dataHeaderRow.getCell(1).value = "位置/交通";
+      dataHeaderRow.getCell(2).value = "序号";
+      dataHeaderRow.getCell(3).value = "门店名称";
+      dataHeaderRow.getCell(4).value = "区域";
+      dataHeaderRow.getCell(5).value = "区域经理";
+      dataHeaderRow.getCell(6).value = "督导";
+      dataHeaderRow.getCell(7).value = "检查日期";
+      dataHeaderRow.getCell(8).value = "总分";
+      for (let i = 9; i <= 43; i++) dataHeaderRow.getCell(i).value = "问题记录/扣分";
+      dataHeaderRow.height = 20;
+      dataHeaderRow.eachCell((cell) => {
+        cell.font = { bold: true, size: 9 };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD4AF37" } };
+        cell.border = {
+          top: { style: "thin" }, bottom: { style: "thin" },
+          left: { style: "thin" }, right: { style: "thin" },
+        };
+      });
+
+      // 数据行
+      inspections.forEach((inspection: any, index: number) => {
+        const itemMap = new Map<number, any>();
+        for (const item of inspection.items) {
+          itemMap.set(item.item_number, item);
+        }
+
+        const rowData: (string | number)[] = [
+          "",
+          index + 1,
+          inspection.store_name,
+          inspection.region || "",
+          "", // 区域经理
+          inspection.supervisor_name,
+          inspection.inspection_date,
+          inspection.total_score,
+        ];
+
+        // 添加35个检查项的问题记录
+        for (let i = 1; i <= 35; i++) {
+          const item = itemMap.get(i);
+          if (item && item.actual_score < item.max_score) {
+            const deduction = item.max_score - item.actual_score;
+            const note = item.notes || `扣${deduction}分`;
+            rowData.push(`${note}-${deduction}`);
+          } else {
+            rowData.push("");
+          }
+        }
+
+        const row = summarySheet.addRow(rowData);
+        row.eachCell((cell, colNumber) => {
+          cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+          cell.border = {
+            top: { style: "thin" }, bottom: { style: "thin" },
+            left: { style: "thin" }, right: { style: "thin" },
+          };
+          // 高亮扣分项
+          if (colNumber > 8 && cell.value && String(cell.value).includes("-")) {
+            cell.font = { color: { argb: "FFCC0000" } };
+          }
+        });
+      });
+
+      // 设置列宽
+      summarySheet.getColumn(1).width = 12;
+      summarySheet.getColumn(2).width = 6;
+      summarySheet.getColumn(3).width = 20;
+      summarySheet.getColumn(4).width = 12;
+      summarySheet.getColumn(5).width = 10;
+      summarySheet.getColumn(6).width = 10;
+      summarySheet.getColumn(7).width = 12;
+      summarySheet.getColumn(8).width = 8;
+      for (let i = 9; i <= 43; i++) {
+        summarySheet.getColumn(i).width = 15;
+      }
+
+      // ===== Sheet 2: 统计分析 =====
+      const statsSheet = workbook.addWorksheet("统计分析");
+
+      // 标题
+      const statsTitle = statsSheet.addRow(["督导评分统计分析"]);
+      statsSheet.mergeCells(1, 1, 1, 7);
+      statsTitle.height = 30;
+      statsTitle.eachCell((cell) => {
+        cell.font = { size: 16, bold: true };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD4AF37" } };
+      });
+
+      statsSheet.addRow([]);
+
+      // 一、总体统计
+      const totalInspections = inspections.length;
+      const avgScore = totalInspections > 0
+        ? Math.round(inspections.reduce((sum: number, i: any) => sum + i.total_score, 0) / totalInspections * 10) / 10
+        : 0;
+      const maxScore = totalInspections > 0 ? Math.max(...inspections.map((i: any) => i.total_score)) : 0;
+      const minScore = totalInspections > 0 ? Math.min(...inspections.map((i: any) => i.total_score)) : 0;
+      const excellentCount = inspections.filter((i: any) => i.total_score >= 90).length;
+      const goodCount = inspections.filter((i: any) => i.total_score >= 70 && i.total_score < 90).length;
+      const poorCount = inspections.filter((i: any) => i.total_score < 70).length;
+
+      const section1Title = statsSheet.addRow(["一、总体统计"]);
+      section1Title.font = { bold: true, size: 12 };
+      statsSheet.addRow(["已检查门店数", totalInspections]);
+      statsSheet.addRow(["平均分", avgScore || "—"]);
+      statsSheet.addRow(["最高分", maxScore]);
+      statsSheet.addRow(["最低分", minScore]);
+      statsSheet.addRow(["优秀数(≥90)", excellentCount]);
+      statsSheet.addRow(["良好数(70-89)", goodCount]);
+      statsSheet.addRow(["较差数(<70)", poorCount]);
+      statsSheet.addRow([]);
+
+      // 二、各区域评分统计
+      const section2Title = statsSheet.addRow(["二、各区域评分统计"]);
+      section2Title.font = { bold: true, size: 12 };
+      const regionHeader = statsSheet.addRow(["区域", "门店总数", "已检查", "平均分", "最高分", "最低分", "优秀率"]);
+      regionHeader.eachCell((cell) => {
+        cell.font = { bold: true };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8E8E8" } };
+        cell.border = {
+          top: { style: "thin" }, bottom: { style: "thin" },
+          left: { style: "thin" }, right: { style: "thin" },
+        };
+      });
+
+      // 按区域统计
+      const regionMap = new Map<string, { total: number; checked: number; scores: number[] }>();
+      for (const inspection of inspections) {
+        const region = inspection.region || "未分类";
+        if (!regionMap.has(region)) {
+          regionMap.set(region, { total: 0, checked: 0, scores: [] });
+        }
+        const r = regionMap.get(region)!;
+        r.checked++;
+        r.scores.push(inspection.total_score);
+      }
+
+      for (const [region, data] of regionMap) {
+        const avg = data.scores.length > 0 ? Math.round(data.scores.reduce((a, b) => a + b, 0) / data.scores.length * 10) / 10 : "—";
+        const max = data.scores.length > 0 ? Math.max(...data.scores) : 0;
+        const min = data.scores.length > 0 ? Math.min(...data.scores) : 0;
+        const excellent = data.scores.filter(s => s >= 90).length;
+        const excellentRate = data.scores.length > 0 ? `${Math.round(excellent / data.scores.length * 100)}%` : "—";
+        const row = statsSheet.addRow([region, data.total, data.checked, avg, max, min, excellentRate]);
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: "thin" }, bottom: { style: "thin" },
+            left: { style: "thin" }, right: { style: "thin" },
+          };
+        });
+      }
+
+      statsSheet.addRow([]);
+
+      // 三、高频问题项统计
+      const section3Title = statsSheet.addRow(["三、高频问题项统计（各项被记录问题的门店数）"]);
+      section3Title.font = { bold: true, size: 12 };
+      const itemHeader = statsSheet.addRow(["序号", "检查项（简称）", "满分", "问题门店数", "问题率"]);
+      itemHeader.eachCell((cell) => {
+        cell.font = { bold: true };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8E8E8" } };
+        cell.border = {
+          top: { style: "thin" }, bottom: { style: "thin" },
+          left: { style: "thin" }, right: { style: "thin" },
+        };
+      });
+
+      // 统计每个检查项的问题数
+      const itemProblemCount = new Map<number, number>();
+      for (let i = 1; i <= 35; i++) itemProblemCount.set(i, 0);
+      for (const inspection of inspections) {
+        for (const item of inspection.items) {
+          if (item.actual_score < item.max_score || (item.notes && item.notes.trim())) {
+            itemProblemCount.set(item.item_number, (itemProblemCount.get(item.item_number) || 0) + 1);
+          }
+        }
+      }
+
+      const itemDescriptions = [
+        "员工仪表仪容规范，佩戴统一工号牌，精神面貌…",
+        "一人一客一物，微笑招呼，规范使用托盘手套放…",
+        "每月职工安全生产记录卡按时填写",
+        "营业准备到位，柜台整洁无私人物品",
+        "各类培训、新品推广及工作按要求完成",
+        "店铺环境整洁，无杂物无卫生死角",
+        "售货环境清洁明亮通风，温度16-26℃",
+        "电子天平校准正常，水平仪气泡居中",
+        "服务公约、当日金价、维修价目表上墙公示",
+        "产品标签按规定串绳，陈列整齐美观",
+        "商品印记、吊牌、证书与产品相符",
+        "商品使用专用道具，防护措施到位",
+        "库存记录本规范填写，早晚签名交接双签",
+        "商品抽查任务表按时填写，双人双签",
+        "进出库记录、进销存/收付存月报表完整",
+        "截料旧金登记规范，添金调换流程规范",
+        "所有销售折扣优惠需公示",
+        "黄金类赠品做好表格登记",
+        "商品检验报告齐全，吊牌有成色记录",
+        "无不合格商品上柜",
+        "灭火器正常有效，每月检查签字",
+        "消防器材无杂物，员工知晓四防应急",
+        "保险柜开库关闭后及时锁好打乱密码",
+        "商品存放专用保险柜，双人双锁管理",
+        "红外线报警系统正常并与110联网",
+        "监控正常运行，录像保留不少于30日",
+        "每日按时解款（下限1000元），上交凭证",
+        "无坐支现金、私设小金库",
+        "销售凭证规范，加盖印记已复秤章，双签",
+        "每日销售与资金数据核对一致",
+        "营业日记规范填写，交接班内容清晰",
+        "企业微信内任务及时完成",
+        "修理售后登记完整，售后服务处理表上传",
+        "顾客财产识别验证保护到位",
+        "顾客意见簿放置到位，投诉处理闭环",
+      ];
+      const maxScores = [5, 5, 3, 2, 5, 2, 2, 3, 3, 2, 3, 2, 4, 3, 4, 4, 2, 2, 2, 2, 3, 3, 5, 5, 2, 2, 2, 3, 3, 2, 2, 2, 2, 2, 2];
+
+      for (let i = 0; i < 35; i++) {
+        const count = itemProblemCount.get(i + 1) || 0;
+        const rate = totalInspections > 0 ? `${Math.round(count / totalInspections * 100)}%` : "—";
+        const row = statsSheet.addRow([i + 1, itemDescriptions[i], maxScores[i], count, rate]);
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: "thin" }, bottom: { style: "thin" },
+            left: { style: "thin" }, right: { style: "thin" },
+          };
+        });
+      }
+
+      // 设置列宽
+      statsSheet.getColumn(1).width = 20;
+      statsSheet.getColumn(2).width = 40;
+      statsSheet.getColumn(3).width = 10;
+      statsSheet.getColumn(4).width = 12;
+      statsSheet.getColumn(5).width = 10;
+      statsSheet.getColumn(6).width = 10;
+      statsSheet.getColumn(7).width = 10;
+
+      // 生成文件
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `老凤祥督导评分汇总表_${new Date().toISOString().split("T")[0]}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("导出综合报表失败:", error);
+      alert("导出失败，请查看控制台错误信息");
+    } finally {
+      setExportingComprehensive(false);
+    }
+  };
+
   // 导出照片打包
   const exportPhotos = async () => {
     if (exportingPhotos || fullData.length === 0) return;
@@ -648,6 +1032,30 @@ export default function StatsPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                   导出照片包
+                </>
+              )}
+            </button>
+          </div>
+          <div className="flex gap-3 mt-3">
+            <button
+              onClick={exportComprehensiveReport}
+              disabled={exportingComprehensive || fullData.length === 0}
+              className="flex-1 bg-purple-600 text-white py-3 rounded-xl font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {exportingComprehensive ? (
+                <>
+                  <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  导出中...
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                  导出汇总统计表
                 </>
               )}
             </button>
