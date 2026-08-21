@@ -127,7 +127,7 @@ export default function HistoryPage() {
       return;
     }
     try {
-      const res = await fetch(`/api/inspections/${id}/delete`, { method: "POST" });
+      const res = await fetch(`/api/inspections/${id}/delete`, { method: "DELETE" });
       const result = await res.json();
       if (result.success) {
         setRecords((prev) => prev.filter((r) => r.id !== id));
