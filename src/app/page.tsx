@@ -467,25 +467,12 @@ export default function InspectionPage() {
                   className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all text-gray-800 bg-white"
                 >
                   <option value="">请选择督导姓名</option>
-                  <option value="张维娅">张维娅</option>
-                  <option value="徐芳">徐芳</option>
-                  <option value="曹聪">曹聪</option>
-                  <option value="朱琼">朱琼</option>
-                  <option value="周鸣">周鸣</option>
-                  <option value="王洁琼">王洁琼</option>
-                  <option value="吴文瑾">吴文瑾</option>
-                  <option value="吴梅">吴梅</option>
-                  <option value="卢峰">卢峰</option>
-                  <option value="程青梅">程青梅</option>
-                  <option value="蒋雯莉">蒋雯莉</option>
-                  <option value="张桦">张桦</option>
-                  <option value="戈巧娟">戈巧娟</option>
-                  <option value="胡惟一">胡惟一</option>
-                  <option value="薛岑">薛岑</option>
-                  <option value="蔡庆">蔡庆</option>
-                  <option value="吴剑锋">吴剑锋</option>
-                  <option value="周明源">周明源</option>
-                  <option value="陈颖莹">陈颖莹</option>
+                  <option value="浦晨鸣">浦晨鸣</option>
+                  <option value="张瑜">张瑜</option>
+                  <option value="陈怡伶">陈怡伶</option>
+                  <option value="桂雅芳">桂雅芳</option>
+                  <option value="陶海诚">陶海诚</option>
+                  <option value="王玮">王玮</option>
                 </select>
               </div>
 
