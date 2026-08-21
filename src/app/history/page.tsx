@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { getRatingInfo } from "@/lib/inspection-data";
 
 interface InspectionRecord {
@@ -18,6 +19,7 @@ interface InspectionRecord {
 }
 
 export default function HistoryPage() {
+  const router = useRouter();
   const [records, setRecords] = useState<InspectionRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "excellent" | "good" | "poor">("all");
@@ -41,15 +43,24 @@ export default function HistoryPage() {
       }
     };
 
-    const checkAdmin = async () => {
+    const checkAdmin = async (retry = false) => {
       try {
         const res = await fetch("/api/admin/check", {
           credentials: "include",
+          cache: "no-store",
         });
         const result = await res.json();
-        setIsAdmin(result.isAdmin === true);
+        const adminStatus = result.isAdmin === true;
+        setIsAdmin(adminStatus);
+        // 如果第一次检查不是管理员，延迟重试一次（处理cookie延迟设置的情况）
+        if (!adminStatus && !retry) {
+          setTimeout(() => checkAdmin(true), 500);
+        }
       } catch (err) {
         console.error("检查管理员状态失败:", err);
+        if (!retry) {
+          setTimeout(() => checkAdmin(true), 500);
+        }
       }
     };
 
@@ -60,12 +71,19 @@ export default function HistoryPage() {
       }
     };
 
+    // 页面获得焦点时也重新检查（处理从其他标签页切换回来的情况）
+    const handleFocus = () => {
+      checkAdmin();
+    };
+
     fetchHistory();
     checkAdmin();
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", handleFocus);
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", handleFocus);
     };
   }, []);
 
@@ -136,10 +154,7 @@ export default function HistoryPage() {
     }
   };
 
-  const handleDelete = async (e: React.MouseEvent, id: number, storeName: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.nativeEvent.stopImmediatePropagation();
+  const handleDelete = async (id: number, storeName: string) => {
     if (!confirm(`确定要删除「${storeName}」的检查记录吗？此操作不可恢复！`)) {
       return;
     }
@@ -332,7 +347,10 @@ export default function HistoryPage() {
                   
                   {/* 记录内容 */}
                   <div className="flex-1 min-w-0">
-                    <Link href={`/result/${record.id}`} className="block">
+                    <div 
+                      onClick={() => router.push(`/result/${record.id}`)}
+                      className="cursor-pointer"
+                    >
                       <div className="flex items-start justify-between mb-2">
                         <div>
                           <h3 className="font-semibold text-gray-800 text-sm">{record.store_name}</h3>
@@ -355,10 +373,15 @@ export default function HistoryPage() {
                           <span className="text-amber-600">查看详情 →</span>
                         </div>
                       </div>
-                    </Link>
+                    </div>
                     {isAdmin && (
                       <button
-                        onClick={(e) => handleDelete(e, record.id, record.store_name)}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleDelete(record.id, record.store_name);
+                        }}
                         disabled={deletingId === record.id}
                         className="mt-2 w-full py-1.5 text-xs text-red-500 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
                       >
