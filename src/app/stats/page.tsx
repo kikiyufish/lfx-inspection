@@ -197,15 +197,29 @@ export default function StatsPage() {
             photoCell.value = ""; // 清空文本
             row.height = 80; // 设置行高以容纳照片
 
-            // 嵌入第一张照片
+            // 嵌入第一张照片 - 使用base64方式，更兼容WPS
             try {
               const photoUrl = item.photo_urls[0];
               const response = await fetch(photoUrl);
-              const arrayBuffer = await response.arrayBuffer();
+              const blob = await response.blob();
+              
+              // 转换为base64
+              const base64 = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  const result = reader.result as string;
+                  // 移除data:image/xxx;base64,前缀
+                  const base64Data = result.split(",")[1] || result;
+                  resolve(base64Data);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+              });
+              
               const imageId = workbook.addImage({
-                buffer: new Uint8Array(arrayBuffer),
+                base64: base64,
                 extension: "jpeg",
-              } as any);
+              });
               detailSheet.addImage(imageId, {
                 tl: { col: 9.1, row: row.number - 1.9 },
                 ext: { width: 100, height: 75 },
