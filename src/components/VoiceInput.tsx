@@ -167,8 +167,16 @@ export function VoiceInput({ value, onChange, placeholder = "整改措施...", c
           onMouseDown={handlePressStart}
           onMouseUp={handlePressEnd}
           onMouseLeave={handlePressEnd}
-          onTouchStart={handlePressStart}
-          onTouchEnd={handlePressEnd}
+          onTouchStart={(e) => {
+            e.preventDefault();
+            handlePressStart();
+          }}
+          onTouchEnd={(e) => {
+            e.preventDefault();
+            handlePressEnd();
+          }}
+          onTouchCancel={handlePressEnd}
+          style={{ touchAction: "none" }}
           className={`absolute right-2 top-2 p-1.5 rounded-lg transition-all select-none ${
             isListening
               ? "bg-red-500 text-white animate-pulse shadow-lg scale-110"
