@@ -9,7 +9,8 @@ interface PhotoUploadProps {
 }
 
 export function PhotoUpload({ itemNumber, photoKeys, onPhotosChange }: PhotoUploadProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const albumInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [previews, setPreviews] = useState<string[]>([]);
 
@@ -56,8 +57,11 @@ export function PhotoUpload({ itemNumber, photoKeys, onPhotosChange }: PhotoUplo
     setUploading(false);
 
     // 重置input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = "";
+    }
+    if (albumInputRef.current) {
+      albumInputRef.current.value = "";
     }
   };
 
@@ -105,9 +109,39 @@ export function PhotoUpload({ itemNumber, photoKeys, onPhotosChange }: PhotoUplo
           </div>
         ))}
 
-        {/* 上传按钮 */}
+        {/* 拍照按钮 */}
         <button
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => {
+            if (cameraInputRef.current) {
+              cameraInputRef.current.click();
+            }
+          }}
+          disabled={uploading}
+          className="w-16 h-16 border-2 border-dashed border-amber-200 rounded-lg flex flex-col items-center justify-center gap-0.5 hover:border-amber-400 hover:bg-amber-50 transition-colors disabled:opacity-50"
+        >
+          {uploading ? (
+            <svg className="w-5 h-5 text-amber-500 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          ) : (
+            <>
+              <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              <span className="text-[10px] text-amber-600">拍照</span>
+            </>
+          )}
+        </button>
+
+        {/* 相册按钮 */}
+        <button
+          onClick={() => {
+            if (albumInputRef.current) {
+              albumInputRef.current.click();
+            }
+          }}
           disabled={uploading}
           className="w-16 h-16 border-2 border-dashed border-gray-200 rounded-lg flex flex-col items-center justify-center gap-0.5 hover:border-amber-400 hover:bg-amber-50 transition-colors disabled:opacity-50"
         >
@@ -119,19 +153,29 @@ export function PhotoUpload({ itemNumber, photoKeys, onPhotosChange }: PhotoUplo
           ) : (
             <>
               <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              <span className="text-[10px] text-gray-400">拍照</span>
+              <span className="text-[10px] text-gray-400">相册</span>
             </>
           )}
         </button>
       </div>
 
+      {/* 拍照输入 - 直接调用相机 */}
       <input
-        ref={fileInputRef}
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+
+      {/* 相册输入 - 从相册选择 */}
+      <input
+        ref={albumInputRef}
         type="file"
         accept="image/jpeg,image/png,image/webp,image/heic"
-        capture="environment"
         onChange={handleFileSelect}
         className="hidden"
       />
