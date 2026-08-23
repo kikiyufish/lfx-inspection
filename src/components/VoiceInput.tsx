@@ -71,7 +71,23 @@ export function VoiceInput({ value, onChange, placeholder = "整改措施...", c
     return recognition;
   }, []);
 
-  const toggleListening = useCallback(() => {
+  const requestMicrophonePermission = async (): Promise<boolean> => {
+    try {
+      // 先尝试使用 getUserMedia 请求麦克风权限
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // 获取权限后立即停止流
+        stream.getTracks().forEach(track => track.stop());
+        return true;
+      }
+      return true; // 如果不支持 getUserMedia，假设权限已授予
+    } catch (e) {
+      console.error("麦克风权限请求失败:", e);
+      return false;
+    }
+  };
+
+  const toggleListening = useCallback(async () => {
     if (isListening) {
       // 停止识别
       if (recognitionRef.current) {
@@ -84,6 +100,13 @@ export function VoiceInput({ value, onChange, placeholder = "整改措施...", c
       }
       setIsListening(false);
     } else {
+      // 先请求麦克风权限
+      const hasPermission = await requestMicrophonePermission();
+      if (!hasPermission) {
+        alert("无法获取麦克风权限，请在浏览器设置中允许麦克风访问");
+        return;
+      }
+
       // 创建新的识别实例（每次都是新的，避免复用问题）
       const recognition = createRecognition();
       if (!recognition) return;
