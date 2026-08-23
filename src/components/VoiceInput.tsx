@@ -15,6 +15,8 @@ export function VoiceInput({ value, onChange, placeholder = "整改措施...", c
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const valueRef = useRef(value);
   const onChangeRef = useRef(onChange);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isPressingRef = useRef(false);
 
   // 保持 ref 与最新值同步
   useEffect(() => {
@@ -26,8 +28,12 @@ export function VoiceInput({ value, onChange, placeholder = "整改措施...", c
   }, [onChange]);
 
   // 检查浏览器支持
+  useEffect(() => {
+    const SpeechRecognition = typeof window !== "undefined" ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
+    setIsSupported(!!SpeechRecognition);
+  }, []);
+
   const SpeechRecognition = typeof window !== "undefined" ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
-  const supported = !!SpeechRecognition;
 
   const createRecognition = useCallback(() => {
     if (!SpeechRecognition) return null;
@@ -73,53 +79,93 @@ export function VoiceInput({ value, onChange, placeholder = "整改措施...", c
 
   const requestMicrophonePermission = async (): Promise<boolean> => {
     try {
-      // 先尝试使用 getUserMedia 请求麦克风权限
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // 获取权限后立即停止流
         stream.getTracks().forEach(track => track.stop());
         return true;
       }
-      return true; // 如果不支持 getUserMedia，假设权限已授予
+      return true;
     } catch (e) {
       console.error("麦克风权限请求失败:", e);
       return false;
     }
   };
 
-  const toggleListening = useCallback(async () => {
+  const startListening = useCallback(async () => {
+    if (!SpeechRecognition) {
+      alert("您的浏览器不支持语音识别功能，请使用 Chrome 或 Safari 浏览器");
+      return;
+    }
+
+    // 先请求麦克风权限
+    const hasPermission = await requestMicrophonePermission();
+    if (!hasPermission) {
+      alert("无法获取麦克风权限，请在浏览器设置中允许麦克风访问");
+      return;
+    }
+
+    // 创建新的识别实例
+    const recognition = createRecognition();
+    if (!recognition) return;
+    recognitionRef.current = recognition;
+    try {
+      recognition.start();
+    } catch (e) {
+      console.warn("启动语音识别失败:", e);
+      recognitionRef.current = null;
+      setIsListening(false);
+    }
+  }, [createRecognition]);
+
+  const stopListening = useCallback(() => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        // 忽略
+      }
+      recognitionRef.current = null;
+    }
+    setIsListening(false);
+  }, []);
+
+  // 长按开始（500ms 后触发）
+  const handlePressStart = useCallback(() => {
+    isPressingRef.current = true;
+    longPressTimerRef.current = setTimeout(() => {
+      if (isPressingRef.current) {
+        startListening();
+      }
+    }, 300); // 300ms 长按触发
+  }, [startListening]);
+
+  // 释放停止
+  const handlePressEnd = useCallback(() => {
+    isPressingRef.current = false;
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
     if (isListening) {
-      // 停止识别
+      stopListening();
+    }
+  }, [isListening, stopListening]);
+
+  // 清理
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+      }
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
         } catch (e) {
           // 忽略
         }
-        recognitionRef.current = null;
       }
-      setIsListening(false);
-    } else {
-      // 先请求麦克风权限
-      const hasPermission = await requestMicrophonePermission();
-      if (!hasPermission) {
-        alert("无法获取麦克风权限，请在浏览器设置中允许麦克风访问");
-        return;
-      }
-
-      // 创建新的识别实例（每次都是新的，避免复用问题）
-      const recognition = createRecognition();
-      if (!recognition) return;
-      recognitionRef.current = recognition;
-      try {
-        recognition.start();
-      } catch (e) {
-        console.warn("启动语音识别失败:", e);
-        recognitionRef.current = null;
-        setIsListening(false);
-      }
-    }
-  }, [isListening, createRecognition]);
+    };
+  }, []);
 
   return (
     <div className={`relative ${className}`}>
@@ -130,16 +176,20 @@ export function VoiceInput({ value, onChange, placeholder = "整改措施...", c
         rows={2}
         className="w-full px-3 py-2 pr-10 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none resize-none transition-all"
       />
-      {supported && (
+      {isSupported && (
         <button
           type="button"
-          onClick={toggleListening}
-          className={`absolute right-2 top-2 p-1.5 rounded-lg transition-all ${
+          onMouseDown={handlePressStart}
+          onMouseUp={handlePressEnd}
+          onMouseLeave={handlePressEnd}
+          onTouchStart={handlePressStart}
+          onTouchEnd={handlePressEnd}
+          className={`absolute right-2 top-2 p-1.5 rounded-lg transition-all select-none ${
             isListening
-              ? "bg-red-500 text-white animate-pulse shadow-lg"
+              ? "bg-red-500 text-white animate-pulse shadow-lg scale-110"
               : "text-gray-400 hover:text-amber-500 hover:bg-amber-50"
           }`}
-          title={isListening ? "点击停止语音输入" : "点击开始语音输入"}
+          title={isListening ? "松开停止录音" : "长按开始语音输入"}
         >
           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
             {isListening ? (
@@ -151,12 +201,12 @@ export function VoiceInput({ value, onChange, placeholder = "整改措施...", c
         </button>
       )}
       {isListening && (
-        <div className="absolute -top-8 right-0 bg-red-500 text-white text-xs px-2 py-1 rounded-md whitespace-nowrap animate-pulse">
-          正在录音...
+        <div className="absolute -top-8 right-0 bg-red-500 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
+          正在录音... 松开结束
         </div>
       )}
-      {!supported && (
-        <div className="absolute -top-8 right-0 bg-gray-500 text-white text-xs px-2 py-1 rounded-md whitespace-nowrap">
+      {!isSupported && (
+        <div className="absolute -top-8 right-0 bg-gray-500 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
           浏览器不支持语音
         </div>
       )}
