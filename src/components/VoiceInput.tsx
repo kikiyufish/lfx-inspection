@@ -77,43 +77,28 @@ export function VoiceInput({ value, onChange, placeholder = "整改措施...", c
     return recognition;
   }, []);
 
-  const requestMicrophonePermission = async (): Promise<boolean> => {
-    try {
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach(track => track.stop());
-        return true;
-      }
-      return true;
-    } catch (e) {
-      console.error("麦克风权限请求失败:", e);
-      return false;
-    }
-  };
-
-  const startListening = useCallback(async () => {
+  const startListening = useCallback(() => {
     if (!SpeechRecognition) {
       alert("您的浏览器不支持语音识别功能，请使用 Chrome 或 Safari 浏览器");
       return;
     }
 
-    // 先请求麦克风权限
-    const hasPermission = await requestMicrophonePermission();
-    if (!hasPermission) {
-      alert("无法获取麦克风权限，请在浏览器设置中允许麦克风访问");
-      return;
-    }
-
-    // 创建新的识别实例
+    // 创建新的识别实例（SpeechRecognition 会自动请求麦克风权限）
     const recognition = createRecognition();
     if (!recognition) return;
     recognitionRef.current = recognition;
+    
     try {
       recognition.start();
-    } catch (e) {
+    } catch (e: any) {
       console.warn("启动语音识别失败:", e);
       recognitionRef.current = null;
       setIsListening(false);
+      
+      // 如果是权限问题，给出明确提示
+      if (e?.name === 'NotAllowedError' || e?.message?.includes('permission')) {
+        alert("麦克风权限被拒绝，请在浏览器设置中允许麦克风访问");
+      }
     }
   }, [createRecognition]);
 
@@ -129,14 +114,14 @@ export function VoiceInput({ value, onChange, placeholder = "整改措施...", c
     setIsListening(false);
   }, []);
 
-  // 长按开始（500ms 后触发）
+  // 长按开始（300ms 后触发）
   const handlePressStart = useCallback(() => {
     isPressingRef.current = true;
     longPressTimerRef.current = setTimeout(() => {
       if (isPressingRef.current) {
         startListening();
       }
-    }, 300); // 300ms 长按触发
+    }, 300);
   }, [startListening]);
 
   // 释放停止
