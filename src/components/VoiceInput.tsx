@@ -13,6 +13,17 @@ export function VoiceInput({ value, onChange, placeholder = "整改措施...", c
   const [isListening, setIsListening] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const valueRef = useRef(value);
+  const onChangeRef = useRef(onChange);
+
+  // 保持 ref 与最新值同步
+  useEffect(() => {
+    valueRef.current = value;
+  }, [value]);
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
   useEffect(() => {
     // 检查浏览器是否支持语音识别
@@ -24,42 +35,52 @@ export function VoiceInput({ value, onChange, placeholder = "整改措施...", c
       recognition.lang = "zh-CN";
       recognition.continuous = true;
       recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
       
       recognition.onresult = (event: SpeechRecognitionEvent) => {
         let finalTranscript = "";
-        let interimTranscript = "";
         
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const transcript = event.results[i][0].transcript;
           if (event.results[i].isFinal) {
             finalTranscript += transcript;
-          } else {
-            interimTranscript += transcript;
           }
         }
         
         if (finalTranscript) {
-          // 将识别的文本追加到现有内容
-          const newValue = value ? value + finalTranscript : finalTranscript;
-          onChange(newValue);
+          // 使用 ref 获取最新值，避免闭包问题
+          const currentValue = valueRef.current;
+          const newValue = currentValue ? currentValue + finalTranscript : finalTranscript;
+          onChangeRef.current(newValue);
         }
       };
       
       recognition.onerror = (event) => {
-        console.error("语音识别错误:", event.error);
-        setIsListening(false);
+        console.warn("语音识别错误:", event.error);
+        // 忽略 aborted 和 no-speech 错误，这些是正常的
+        if (event.error !== "aborted" && event.error !== "no-speech") {
+          setIsListening(false);
+        }
       };
       
       recognition.onend = () => {
         setIsListening(false);
       };
       
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+      
       recognitionRef.current = recognition;
     }
     
     return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
+      if (recognitionRef.current && isListening) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {
+          // 忽略停止时的错误
+        }
       }
     };
   }, []);
@@ -68,14 +89,18 @@ export function VoiceInput({ value, onChange, placeholder = "整改措施...", c
     if (!recognitionRef.current) return;
     
     if (isListening) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        // 忽略停止时的错误
+      }
       setIsListening(false);
     } else {
       try {
         recognitionRef.current.start();
-        setIsListening(true);
       } catch (e) {
-        console.error("启动语音识别失败:", e);
+        console.warn("启动语音识别失败:", e);
+        setIsListening(false);
       }
     }
   }, [isListening]);
