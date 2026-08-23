@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 
 interface VoiceInputProps {
   value: string;
@@ -25,85 +25,78 @@ export function VoiceInput({ value, onChange, placeholder = "整改措施...", c
     onChangeRef.current = onChange;
   }, [onChange]);
 
-  useEffect(() => {
-    // 检查浏览器是否支持语音识别
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    setIsSupported(!!SpeechRecognition);
-    
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.lang = "zh-CN";
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.maxAlternatives = 1;
-      
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
-        let finalTranscript = "";
-        
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            finalTranscript += transcript;
-          }
-        }
-        
-        if (finalTranscript) {
-          // 使用 ref 获取最新值，避免闭包问题
-          const currentValue = valueRef.current;
-          const newValue = currentValue ? currentValue + finalTranscript : finalTranscript;
-          onChangeRef.current(newValue);
-        }
-      };
-      
-      recognition.onerror = (event) => {
-        console.warn("语音识别错误:", event.error);
-        // 忽略 aborted 和 no-speech 错误，这些是正常的
-        if (event.error !== "aborted" && event.error !== "no-speech") {
-          setIsListening(false);
-        }
-      };
-      
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-      
-      recognition.onstart = () => {
-        setIsListening(true);
-      };
-      
-      recognitionRef.current = recognition;
-    }
-    
-    return () => {
-      if (recognitionRef.current && isListening) {
-        try {
-          recognitionRef.current.stop();
-        } catch (e) {
-          // 忽略停止时的错误
+  // 检查浏览器支持
+  const SpeechRecognition = typeof window !== "undefined" ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
+  const supported = !!SpeechRecognition;
+
+  const createRecognition = useCallback(() => {
+    if (!SpeechRecognition) return null;
+    const recognition = new SpeechRecognition();
+    recognition.lang = "zh-CN";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let finalTranscript = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
         }
       }
+      if (finalTranscript) {
+        const currentValue = valueRef.current;
+        const newValue = currentValue ? currentValue + finalTranscript : finalTranscript;
+        onChangeRef.current(newValue);
+      }
     };
+
+    recognition.onerror = (event) => {
+      console.warn("语音识别错误:", event.error);
+      if (event.error !== "aborted" && event.error !== "no-speech" && event.error !== "audio-capture") {
+        setIsListening(false);
+      }
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      recognitionRef.current = null;
+    };
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    return recognition;
   }, []);
 
   const toggleListening = useCallback(() => {
-    if (!recognitionRef.current) return;
-    
     if (isListening) {
-      try {
-        recognitionRef.current.stop();
-      } catch (e) {
-        // 忽略停止时的错误
+      // 停止识别
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {
+          // 忽略
+        }
+        recognitionRef.current = null;
       }
       setIsListening(false);
     } else {
+      // 创建新的识别实例（每次都是新的，避免复用问题）
+      const recognition = createRecognition();
+      if (!recognition) return;
+      recognitionRef.current = recognition;
       try {
-        recognitionRef.current.start();
+        recognition.start();
       } catch (e) {
         console.warn("启动语音识别失败:", e);
+        recognitionRef.current = null;
         setIsListening(false);
       }
     }
-  }, [isListening]);
+  }, [isListening, createRecognition]);
 
   return (
     <div className={`relative ${className}`}>
@@ -114,34 +107,34 @@ export function VoiceInput({ value, onChange, placeholder = "整改措施...", c
         rows={2}
         className="w-full px-3 py-2 pr-10 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none resize-none transition-all"
       />
-      {isSupported && (
+      {supported && (
         <button
           type="button"
           onClick={toggleListening}
-          className={`absolute right-2 top-2 w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+          className={`absolute right-2 top-2 p-1.5 rounded-lg transition-all ${
             isListening
-              ? "bg-red-500 text-white animate-pulse"
-              : "bg-gray-100 text-gray-500 hover:bg-amber-100 hover:text-amber-600"
+              ? "bg-red-500 text-white animate-pulse shadow-lg"
+              : "text-gray-400 hover:text-amber-500 hover:bg-amber-50"
           }`}
           title={isListening ? "点击停止语音输入" : "点击开始语音输入"}
         >
-          {isListening ? (
-            // 停止图标
-            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+            {isListening ? (
               <rect x="6" y="6" width="12" height="12" rx="2" />
-            </svg>
-          ) : (
-            // 麦克风图标
-            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
-              <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
-            </svg>
-          )}
+            ) : (
+              <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5zm6 6c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+            )}
+          </svg>
         </button>
       )}
       {isListening && (
-        <div className="absolute -top-6 left-0 text-xs text-red-500 animate-pulse">
-          正在聆听...
+        <div className="absolute -top-8 right-0 bg-red-500 text-white text-xs px-2 py-1 rounded-md whitespace-nowrap animate-pulse">
+          正在录音...
+        </div>
+      )}
+      {!supported && (
+        <div className="absolute -top-8 right-0 bg-gray-500 text-white text-xs px-2 py-1 rounded-md whitespace-nowrap">
+          浏览器不支持语音
         </div>
       )}
     </div>
