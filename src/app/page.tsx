@@ -7,10 +7,12 @@ import { PhotoUpload } from "@/components/PhotoUpload";
 import { ScoreSlider } from "@/components/ScoreSlider";
 import { CategorySection } from "@/components/CategorySection";
 import { SubmitModal } from "@/components/SubmitModal";
+import { VoiceInput } from "@/components/VoiceInput";
 
 interface ItemData {
   actual_score: number;
   notes: string;
+  rectification: string;
   photo_keys: string[];
 }
 
@@ -251,10 +253,11 @@ export default function InspectionPage() {
             if (data.items && Array.isArray(data.items)) {
               const newItemData: Record<number, ItemData> = {};
               const newScoredItems = new Set<number>();
-              data.items.forEach((item: { item_number: number; actual_score: number; notes: string; photo_keys: string[] }) => {
+              data.items.forEach((item: { item_number: number; actual_score: number; notes: string; rectification?: string; photo_keys: string[] }) => {
                 newItemData[item.item_number] = {
                   actual_score: item.actual_score,
                   notes: item.notes || "",
+                  rectification: item.rectification || "",
                   photo_keys: item.photo_keys || [],
                 };
                 newScoredItems.add(item.item_number);
@@ -273,7 +276,7 @@ export default function InspectionPage() {
   const updateItemData = useCallback(
     (itemNumber: number, field: keyof ItemData, value: number | string | string[]) => {
       setItemData((prev) => {
-        const existing = prev[itemNumber] || { actual_score: 0, notes: "", photo_keys: [] };
+        const existing = prev[itemNumber] || { actual_score: 0, notes: "", rectification: "", photo_keys: [] };
         return {
           ...prev,
           [itemNumber]: {
@@ -333,6 +336,7 @@ export default function InspectionPage() {
           max_score: item.maxScore,
           actual_score: itemData[item.itemNumber]?.actual_score || 0,
           notes: itemData[item.itemNumber]?.notes || "",
+          rectification: itemData[item.itemNumber]?.rectification || "",
           photo_keys: itemData[item.itemNumber]?.photo_keys || [],
         })),
       };
@@ -789,6 +793,26 @@ export default function InspectionPage() {
                     className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none resize-none transition-all"
                   />
                 </div>
+
+                {/* 整改措施 - 扣分时自动展开 */}
+                {(itemData[item.itemNumber]?.actual_score ?? 0) < item.maxScore && (
+                  <div className="mt-3 p-3 bg-orange-50 rounded-xl border border-orange-100">
+                    <div className="flex items-center gap-2 mb-2">
+                      <svg className="w-4 h-4 text-orange-500" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                      </svg>
+                      <span className="text-sm font-medium text-orange-700">整改措施</span>
+                      <span className="text-xs text-orange-400">（支持语音输入）</span>
+                    </div>
+                    <VoiceInput
+                      value={itemData[item.itemNumber]?.rectification || ""}
+                      onChange={(val) =>
+                        updateItemData(item.itemNumber, "rectification", val)
+                      }
+                      placeholder="请描述整改要求，可点击麦克风语音输入..."
+                    />
+                  </div>
+                )}
 
                 {/* 照片上传 */}
                 <PhotoUpload

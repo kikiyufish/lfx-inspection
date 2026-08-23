@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
       max_score: number;
       actual_score: number;
       notes?: string;
+      rectification?: string;
       photo_keys?: string[];
     }) => ({
       inspection_id: inspection.id,
@@ -65,6 +66,7 @@ export async function POST(request: NextRequest) {
       max_score: item.max_score,
       actual_score: item.actual_score || 0,
       notes: item.notes || null,
+      rectification: item.rectification || null,
       photo_keys: item.photo_keys || null,
     }));
 

@@ -360,7 +360,7 @@ export async function GET(
           itemData?.notes || `扣${deduction}分`,
           category.name,
           level,
-          '',  // 整改措施（待填写）
+          itemData?.rectification || '',  // 整改措施
           ''   // 整改结果（待填写）
         ]);
         row.height = 30;

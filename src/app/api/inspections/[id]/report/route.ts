@@ -66,6 +66,7 @@ export async function GET(
       max_score: number;
       actual_score: number;
       notes: string | null;
+      rectification: string | null;
     }, idx: number) => {
       const deduction = item.max_score - item.actual_score;
       // 找到对应的检查大类编号
@@ -74,13 +75,14 @@ export async function GET(
       const problemDesc = `${catCode}/${item.item_number} ${item.description}`;
       const level = deduction >= 3 ? '一般' : '轻微';
       const note = item.notes && item.notes.trim() ? item.notes : `扣${deduction}分，需整改`;
+      const rectification = item.rectification && item.rectification.trim() ? item.rectification : '';
 
       return {
         seq: idx + 1,
         desc: problemDesc,
         level,
         deduction,
-        measure: note,
+        measure: rectification || note,
         result: '',
       };
     });

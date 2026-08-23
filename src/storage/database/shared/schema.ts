@@ -43,6 +43,7 @@ export const inspectionItems = pgTable(
     max_score: integer("max_score").notNull(),
     actual_score: integer("actual_score").notNull().default(0),
     notes: text("notes"),
+    rectification: text("rectification"),
     photo_keys: jsonb("photo_keys"),
     created_at: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

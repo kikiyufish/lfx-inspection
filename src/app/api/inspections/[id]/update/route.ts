@@ -98,6 +98,7 @@ export async function PUT(
       max_score: number;
       actual_score: number;
       notes?: string;
+      rectification?: string;
       photo_keys?: string[];
     }) => ({
       inspection_id: inspectionId,
@@ -107,6 +108,7 @@ export async function PUT(
       max_score: item.max_score,
       actual_score: item.actual_score,
       notes: item.notes || "",
+      rectification: item.rectification || "",
       photo_keys: item.photo_keys || [],
     }));
 
