@@ -7,7 +7,6 @@ import { PhotoUpload } from "@/components/PhotoUpload";
 import { ScoreSlider } from "@/components/ScoreSlider";
 import { CategorySection } from "@/components/CategorySection";
 import { SubmitModal } from "@/components/SubmitModal";
-import { VoiceInput } from "@/components/VoiceInput";
 
 interface ItemData {
   actual_score: number;
@@ -802,14 +801,15 @@ export default function InspectionPage() {
                         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
                       </svg>
                       <span className="text-sm font-medium text-orange-700">整改措施</span>
-                      <span className="text-xs text-orange-400">（支持语音输入）</span>
                     </div>
-                    <VoiceInput
+                    <textarea
                       value={itemData[item.itemNumber]?.rectification || ""}
-                      onChange={(val) =>
-                        updateItemData(item.itemNumber, "rectification", val)
+                      onChange={(e) =>
+                        updateItemData(item.itemNumber, "rectification", e.target.value)
                       }
-                      placeholder="请描述整改要求，可点击麦克风语音输入..."
+                      placeholder="请描述整改要求..."
+                      className="w-full p-2 border border-orange-200 rounded-lg text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+                      rows={3}
                     />
                   </div>
                 )}
