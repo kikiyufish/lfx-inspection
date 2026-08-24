@@ -119,40 +119,40 @@ export default function StatsPage() {
         views: [{ state: "frozen", ySplit: 2 }],
       });
 
-      // 设置列宽
+      // 设置列宽 - 匹配模板格式（13列）
       detailSheet.columns = [
         { header: "区域", key: "region", width: 10 },
         { header: "门店名称", key: "store", width: 18 },
         { header: "负责人", key: "responsible", width: 10 },
         { header: "检查日期", key: "date", width: 12 },
         { header: "督导", key: "supervisor", width: 10 },
-        { header: "检查大类", key: "category", width: 14 },
+        { header: "检查项目", key: "category", width: 14 },
         { header: "序号", key: "num", width: 6 },
-        { header: "检查项目及标准", key: "desc", width: 45 },
+        { header: "检查标准", key: "desc", width: 45 },
         { header: "满分", key: "max", width: 6 },
         { header: "得分", key: "score", width: 6 },
-        { header: "扣分", key: "deduction", width: 6 },
-        { header: "问题记录", key: "notes", width: 30 },
         { header: "现场照片", key: "photos", width: 25 },
+        { header: "扣分", key: "deduction", width: 6 },
+        { header: "备注", key: "notes", width: 30 },
       ];
 
       // 标题行样式
       const titleRow = detailSheet.addRow(["老凤祥督导巡店检查报告"]);
       titleRow.font = { size: 16, bold: true, color: { argb: "FFB45515" } };
       titleRow.alignment = { horizontal: "center" };
-      detailSheet.mergeCells(1, 1, 1, 11);
+      detailSheet.mergeCells(1, 1, 1, 13);
 
       const subtitleRow = detailSheet.addRow([
         `统计周期: 近${days}天 | 导出时间: ${new Date().toLocaleString("zh-CN")}`,
       ]);
       subtitleRow.font = { size: 10, color: { argb: "FF666666" } };
       subtitleRow.alignment = { horizontal: "center" };
-      detailSheet.mergeCells(2, 1, 2, 11);
+      detailSheet.mergeCells(2, 1, 2, 13);
 
-      // 表头行
+      // 表头行 - 匹配模板格式
       const headerRow = detailSheet.addRow([
-        "门店名称", "检查日期", "督导", "检查大类", "序号",
-        "检查项目及标准", "满分", "得分", "扣分", "问题记录", "现场照片",
+        "区域", "门店名称", "负责人", "检查日期", "督导", "检查项目", "序号",
+        "检查标准", "满分", "得分", "现场照片", "扣分", "备注",
       ]);
       headerRow.eachCell((cell) => {
         cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
