@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
     detailSheet.getRow(2).height = 22;
     
     // Row 3: 表头
-    const headers = ['区域', '门店名称', '负责人', '检查日期', '督导', '检查项目', '序号', '检查标准', '满分', '得分', '现场照片', '扣分', '备注'];
+    const headers = ['区域', '门店名称', '区域经理', '检查日期', '督导', '检查项目', '序号', '检查标准', '满分', '得分', '现场照片', '扣分', '备注'];
     const headerRow = detailSheet.addRow(headers);
     headerRow.height = 28;
     for (let col = 1; col <= 13; col++) {
