@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { inspectionCategories, getAllItems, getRatingInfo } from "@/lib/inspection-data";
 import { PhotoUpload } from "@/components/PhotoUpload";
@@ -42,7 +42,8 @@ interface TodayRecord {
 
 const DRAFT_KEY = "inspection_draft";
 
-export default function InspectionPage() {
+// 内部组件：使用 useSearchParams
+function InspectionPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");
@@ -863,5 +864,14 @@ export default function InspectionPage() {
         />
       )}
     </div>
+  );
+}
+
+// 导出组件：包裹 Suspense 边界
+export default function InspectionPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="text-gray-500">加载中...</div></div>}>
+      <InspectionPageContent />
+    </Suspense>
   );
 }
