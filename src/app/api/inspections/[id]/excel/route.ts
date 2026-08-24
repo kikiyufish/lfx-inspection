@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import ExcelJS from 'exceljs';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { inspectionCategories } from '@/lib/inspection-data';
-import { getSignedUrl, downloadFile } from '@/lib/storage';
+import { downloadFile } from '@/lib/storage';
 
 export async function GET(
   request: NextRequest,
@@ -35,95 +35,63 @@ export async function GET(
     // 创建工作簿
     const workbook = new ExcelJS.Workbook();
     
-    // 获取区域和负责人信息
     const region = inspection.region || '';
     const responsible = inspection.responsible_person || '';
+    const allFlatItems = inspectionCategories.flatMap(cat => cat.items);
     
-    // ==================== Sheet 1: 检查评分表 ====================
-    const checkSheet = workbook.addWorksheet('检查评分表');
+    // ==================== Sheet 1: 检查项明细 ====================
+    const ws = workbook.addWorksheet('检查项明细');
     
-    // 设置列宽
-    checkSheet.columns = [
-      { width: 12 },  // A: 区域
-      { width: 15 },  // B: 门店名称
-      { width: 12 },  // C: 负责人
+    // 13列: A-M
+    ws.columns = [
+      { width: 10 },  // A: 区域
+      { width: 16 },  // B: 门店名称
+      { width: 10 },  // C: 负责人
       { width: 12 },  // D: 检查日期
-      { width: 12 },  // E: 督导
-      { width: 15 },  // F: 检查大类
+      { width: 10 },  // E: 督导
+      { width: 14 },  // F: 检查项目
       { width: 6 },   // G: 序号
-      { width: 35 },  // H: 检查项目及标准
-      { width: 15 },  // I: (合并)
-      { width: 15 },  // J: (合并)
-      { width: 8 },   // K: 满分
-      { width: 8 },   // L: 得分
-      { width: 8 },   // M: 扣分
-      { width: 30 },  // N: 问题记录
-      { width: 15 }   // O: 现场照片
+      { width: 45 },  // H: 检查标准
+      { width: 8 },   // I: 满分
+      { width: 8 },   // J: 得分
+      { width: 15 },  // K: 现场照片
+      { width: 8 },   // L: 扣分
+      { width: 25 },  // M: 备注
     ];
     
-    // 标题行
-    checkSheet.mergeCells('A1:O1');
-    const titleCell = checkSheet.getCell('A1');
+    // Row 1: 标题
+    ws.mergeCells('A1:M1');
+    const titleCell = ws.getCell('A1');
     titleCell.value = '老凤祥督导巡店检查报告';
     titleCell.font = { size: 16, bold: true, name: '微软雅黑' };
     titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    checkSheet.getRow(1).height = 35;
+    ws.getRow(1).height = 35;
     
-    // 门店信息行
-    const infoRow = checkSheet.addRow([
-      `区域：${region}`,
-      `门店名称：${inspection.store_name}`,
-      `负责人：${responsible}`,
-      `检查日期：${inspection.inspection_date}`,
-      `督导：${inspection.supervisor_name}`,
-      '', '', '', '', '', '', '', '', '', ''
-    ]);
-    infoRow.height = 25;
-    checkSheet.mergeCells('A2:E2');
-    checkSheet.mergeCells('F2:J2');
-    checkSheet.mergeCells('K2:O2');
-    checkSheet.getCell('A2').value = `区域：${region}    门店名称：${inspection.store_name}    负责人：${responsible}`;
-    checkSheet.getCell('F2').value = `检查日期：${inspection.inspection_date}    督导：${inspection.supervisor_name}`;
-    checkSheet.getCell('K2').value = `总分：${inspection.total_score}    评级：${inspection.rating}`;
-    for (let col = 1; col <= 15; col++) {
-      const cell = infoRow.getCell(col);
-      cell.font = { size: 11, bold: true, name: '微软雅黑' };
-      cell.alignment = { vertical: 'middle', horizontal: 'center' };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF5F5F5' } };
-    }
+    // Row 2: 统计信息
+    ws.mergeCells('A2:M2');
+    const now = new Date();
+    const timeStr = `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+    ws.getCell('A2').value = `统计周期: 近30天 | 导出时间: ${timeStr}`;
+    ws.getCell('A2').font = { size: 10, name: '微软雅黑', color: { argb: 'FF666666' } };
+    ws.getCell('A2').alignment = { horizontal: 'center', vertical: 'middle' };
+    ws.getRow(2).height = 22;
     
-    // 表头行
-    const headerRow = checkSheet.addRow([
-      '区域',           // A
-      '门店名称',       // B
-      '负责人',         // C
-      '检查日期',       // D
-      '督导',           // E
-      '检查项目',       // F
-      '序号',           // G
-      '检查标准',       // H
-      '满分',           // I
-      '得分',           // J
-      '现场照片',       // K
-      '扣分',           // L
-      '备注'            // M
-    ]);
-    headerRow.height = 25;
-    
+    // Row 3: 表头
+    const headers = ['区域', '门店名称', '负责人', '检查日期', '督导', '检查项目', '序号', '检查标准', '满分', '得分', '现场照片', '扣分', '备注'];
+    const headerRow = ws.addRow(headers);
+    headerRow.height = 28;
     for (let col = 1; col <= 13; col++) {
       const cell = headerRow.getCell(col);
       cell.font = { size: 10, bold: true, name: '微软雅黑' };
       cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD4AF37' } };
       cell.border = {
-        top: { style: 'thin' },
-        left: { style: 'thin' },
-        bottom: { style: 'thin' },
-        right: { style: 'thin' }
+        top: { style: 'thin' }, left: { style: 'thin' },
+        bottom: { style: 'thin' }, right: { style: 'thin' }
       };
     }
     
-    // 填充检查项数据
+    // Row 4+: 数据行
     let rowNum = 4;
     for (const category of inspectionCategories) {
       const startRow = rowNum;
@@ -135,48 +103,42 @@ export async function GET(
         const rectification = itemData?.rectification || '';
         const deduction = item.maxScore - actualScore;
         
-        // 获取照片
-        const photoKeys = itemData?.photo_keys ? JSON.parse(itemData.photo_keys) : [];
-        
-        // 合并问题记录和整改措施
         let displayNotes = notes;
         if (rectification) {
           displayNotes = notes ? `${notes}\n【整改措施】${rectification}` : `【整改措施】${rectification}`;
         }
         
-        const row = checkSheet.addRow([
-          region,                    // A: 区域
-          inspection.store_name,     // B: 门店名称
-          responsible,               // C: 负责人
-          inspection.inspection_date, // D: 检查日期
-          inspection.supervisor_name, // E: 督导
-          '',                        // F: 检查项目（稍后合并）
-          item.itemNumber,           // G: 序号
-          item.description,          // H: 检查标准
-          item.maxScore,             // I: 满分
-          actualScore,               // J: 得分
-          '',                        // K: 现场照片
-          deduction,                 // L: 扣分
-          displayNotes               // M: 备注
+        const row = ws.addRow([
+          region,
+          inspection.store_name,
+          responsible,
+          inspection.inspection_date,
+          inspection.supervisor_name,
+          '',                         // F: 检查项目（合并）
+          item.itemNumber,
+          item.description,
+          item.maxScore,
+          actualScore,
+          '',                         // K: 现场照片
+          deduction,
+          displayNotes
         ]);
         
         row.height = 35;
         
-        // 设置边框和对齐
         for (let col = 1; col <= 13; col++) {
           const cell = row.getCell(col);
           cell.font = { size: 10, name: '微软雅黑' };
           cell.alignment = { vertical: 'middle', wrapText: true };
           cell.border = {
-            top: { style: 'thin' },
-            left: { style: 'thin' },
-            bottom: { style: 'thin' },
-            right: { style: 'thin' }
+            top: { style: 'thin' }, left: { style: 'thin' },
+            bottom: { style: 'thin' }, right: { style: 'thin' }
           };
         }
         
-        // 居中的列
-        row.getCell(6).alignment = { horizontal: 'center', vertical: 'middle' };
+        // 居中列
+        row.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' };
+        row.getCell(6).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
         row.getCell(7).alignment = { horizontal: 'center', vertical: 'middle' };
         row.getCell(9).alignment = { horizontal: 'center', vertical: 'middle' };
         row.getCell(10).alignment = { horizontal: 'center', vertical: 'middle' };
@@ -184,30 +146,35 @@ export async function GET(
         row.getCell(12).alignment = { horizontal: 'center', vertical: 'middle' };
         
         // 得分颜色
-        const scoreCell = row.getCell(10);
         if (actualScore < item.maxScore) {
-          scoreCell.font = { size: 10, name: '微软雅黑', color: { argb: 'FFFF0000' } };
+          row.getCell(10).font = { size: 10, name: '微软雅黑', color: { argb: 'FFFF0000' } };
         }
-        
         // 扣分颜色
-        const deductionCell = row.getCell(12);
         if (deduction > 0) {
-          deductionCell.font = { size: 10, name: '微软雅黑', color: { argb: 'FFFF0000' } };
+          row.getCell(12).font = { size: 10, name: '微软雅黑', color: { argb: 'FFFF0000' } };
         }
         
         // 插入照片到K列
+        let photoKeys: string[] = [];
+        try {
+          if (itemData?.photo_keys) {
+            photoKeys = JSON.parse(itemData.photo_keys);
+          }
+        } catch {
+          photoKeys = [];
+        }
         if (photoKeys.length > 0) {
           try {
             const firstPhotoKey = photoKeys[0];
             const photoBuffer = await downloadFile(firstPhotoKey);
             if (photoBuffer) {
               const imageId = workbook.addImage({
-                buffer: new Uint8Array(photoBuffer),
+                buffer: photoBuffer as any,
                 extension: 'jpeg',
               });
-              checkSheet.addImage(imageId, {
-                tl: { col: 10.5, row: rowNum - 2.5 },
-                ext: { width: 80, height: 80 }
+              ws.addImage(imageId, {
+                tl: { col: 10.15, row: rowNum - 0.85 },
+                ext: { width: 100, height: 75 }
               });
             }
           } catch (photoError) {
@@ -220,140 +187,282 @@ export async function GET(
       
       // 合并检查大类列
       const endRow = rowNum - 1;
-      if (startRow < endRow) {
-        checkSheet.mergeCells(`F${startRow}:F${endRow}`);
+      if (startRow <= endRow) {
+        ws.mergeCells(`F${startRow}:F${endRow}`);
       }
-      const categoryCell = checkSheet.getCell(`F${startRow}`);
+      const categoryCell = ws.getCell(`F${startRow}`);
       categoryCell.value = `${category.name}\n（${category.maxScore}分）`;
       categoryCell.font = { size: 10, bold: true, name: '微软雅黑' };
       categoryCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
       categoryCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF8DC' } };
     }
     
-    // 总分行
-    const totalRow = checkSheet.addRow(['', '', '', '', '', '总  分', '', '', '', '', '', inspection.total_score, '']);
-    totalRow.height = 25;
-    checkSheet.mergeCells(`A${rowNum}:E${rowNum}`);
-    checkSheet.mergeCells(`F${rowNum}:L${rowNum}`);
-    checkSheet.getCell(`F${rowNum}`).font = { size: 12, bold: true, name: '微软雅黑' };
-    checkSheet.getCell(`F${rowNum}`).alignment = { horizontal: 'center', vertical: 'middle' };
-    checkSheet.getCell(`M${rowNum}`).font = { size: 14, bold: true, name: '微软雅黑', color: { argb: 'FFD4AF37' } };
-    checkSheet.getCell(`M${rowNum}`).alignment = { horizontal: 'center', vertical: 'middle' };
-    for (let col = 1; col <= 13; col++) {
-      totalRow.getCell(col).border = {
-        top: { style: 'thin' },
-        left: { style: 'thin' },
-        bottom: { style: 'thin' },
-        right: { style: 'thin' }
-      };
-    }
-    rowNum++;
+    // ==================== Sheet 2: 汇总统计 ====================
+    const statsSheet = workbook.addWorksheet('汇总统计');
     
-    // 评定行
-    const ratingText = inspection.rating === '优秀' 
-      ? '优秀（90-100分）' 
-      : (inspection.rating === '良好' ? '良好（70-89分）' : '较差（<70分）');
-    const ratingRow = checkSheet.addRow(['', '', '', '', '', '评定等级', '', '', '', '', '', ratingText, '']);
-    ratingRow.height = 25;
-    checkSheet.mergeCells(`A${rowNum}:E${rowNum}`);
-    checkSheet.mergeCells(`F${rowNum}:L${rowNum}`);
-    checkSheet.getCell(`F${rowNum}`).font = { size: 12, bold: true, name: '微软雅黑' };
-    checkSheet.getCell(`F${rowNum}`).alignment = { horizontal: 'center', vertical: 'middle' };
-    const ratingCell = checkSheet.getCell(`M${rowNum}`);
-    ratingCell.font = { size: 12, bold: true, name: '微软雅黑', color: { argb: 'FFD4AF37' } };
-    ratingCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    for (let col = 1; col <= 13; col++) {
-      ratingRow.getCell(col).border = {
-        top: { style: 'thin' },
-        left: { style: 'thin' },
-        bottom: { style: 'thin' },
-        right: { style: 'thin' }
-      };
-    }
-    
-    // 导出时间
-    const exportTimeRow = checkSheet.addRow([`导出时间：${new Date().toLocaleString('zh-CN')}`, '', '', '', '', '', '', '', '', '', '', '', '']);
-    exportTimeRow.height = 20;
-    checkSheet.mergeCells(`A${rowNum + 1}:M${rowNum + 1}`);
-    checkSheet.getCell(`A${rowNum + 1}`).font = { size: 9, name: '微软雅黑', color: { argb: 'FF888888' } };
-    
-    // ==================== Sheet 2: 问题汇总表 ====================
-    const problemSheet = workbook.addWorksheet('问题汇总表');
-    
-    problemSheet.columns = [
-      { width: 15 },  // A: 检查大类
-      { width: 6 },   // B: 序号
-      { width: 40 },  // C: 检查项目
-      { width: 10 },  // D: 扣分
-      { width: 40 },  // E: 问题记录
-      { width: 40 }   // F: 整改措施
+    statsSheet.columns = [
+      { width: 18 },
+      { width: 25 },
+      { width: 50 },
     ];
     
     // 标题
-    problemSheet.mergeCells('A1:F1');
-    problemSheet.getCell('A1').value = '问题汇总表';
-    problemSheet.getCell('A1').font = { size: 14, bold: true, name: '微软雅黑' };
-    problemSheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
-    problemSheet.getRow(1).height = 30;
+    statsSheet.mergeCells('A1:C1');
+    statsSheet.getCell('A1').value = '巡店检查统计汇总';
+    statsSheet.getCell('A1').font = { size: 14, bold: true, name: '微软雅黑' };
+    statsSheet.getCell('A1').alignment = { horizontal: 'center', vertical: 'middle' };
+    statsSheet.getRow(1).height = 30;
+    
+    // 统计周期
+    statsSheet.mergeCells('A2:C2');
+    statsSheet.getCell('A2').value = '统计周期: 近30天';
+    statsSheet.getCell('A2').font = { size: 10, name: '微软雅黑', color: { argb: 'FF666666' } };
+    statsSheet.getRow(2).height = 20;
+    
+    // 空行
+    let sRow = 4;
+    
+    // 统计报告标题
+    statsSheet.mergeCells(`A${sRow}:C${sRow}`);
+    statsSheet.getCell(`A${sRow}`).value = '老凤祥督导巡店统计报告';
+    statsSheet.getCell(`A${sRow}`).font = { size: 12, bold: true, name: '微软雅黑' };
+    sRow++;
+    statsSheet.mergeCells(`A${sRow}:C${sRow}`);
+    statsSheet.getCell(`A${sRow}`).value = '统计周期: 近30天';
+    statsSheet.getCell(`A${sRow}`).font = { size: 10, name: '微软雅黑', color: { argb: 'FF666666' } };
+    sRow++;
+    
+    // 统计数据
+    const totalScore = inspection.total_score || 0;
+    const rating = inspection.rating || '';
+    const isExcellent = totalScore >= 90;
+    const isGood = totalScore >= 70 && totalScore < 90;
+    const isPoor = totalScore < 70;
+    
+    const statsData = [
+      ['检查次数', '1'],
+      ['平均得分', String(totalScore)],
+      ['优秀次数', isExcellent ? '1' : '0'],
+      ['良好次数', isGood ? '1' : '0'],
+      ['较差次数', isPoor ? '1' : '0'],
+      ['优秀率', isExcellent ? '100%' : '0%'],
+    ];
     
     // 表头
-    const problemHeader = problemSheet.addRow(['检查大类', '序号', '检查项目', '扣分', '问题记录', '整改措施']);
-    problemHeader.height = 25;
-    for (let col = 1; col <= 6; col++) {
-      const cell = problemHeader.getCell(col);
-      cell.font = { size: 10, bold: true, name: '微软雅黑' };
-      cell.alignment = { horizontal: 'center', vertical: 'middle' };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD4AF37' } };
-      cell.border = {
-        top: { style: 'thin' },
-        left: { style: 'thin' },
-        bottom: { style: 'thin' },
-        right: { style: 'thin' }
-      };
+    statsSheet.getCell(`A${sRow}`).value = '项目';
+    statsSheet.getCell(`B${sRow}`).value = '数值';
+    statsSheet.getCell(`A${sRow}`).font = { size: 10, bold: true, name: '微软雅黑' };
+    statsSheet.getCell(`B${sRow}`).font = { size: 10, bold: true, name: '微软雅黑' };
+    statsSheet.getCell(`A${sRow}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD4AF37' } };
+    statsSheet.getCell(`B${sRow}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD4AF37' } };
+    sRow++;
+    
+    for (const [label, value] of statsData) {
+      statsSheet.getCell(`A${sRow}`).value = label;
+      statsSheet.getCell(`B${sRow}`).value = value;
+      statsSheet.getCell(`A${sRow}`).font = { size: 10, name: '微软雅黑' };
+      statsSheet.getCell(`B${sRow}`).font = { size: 10, name: '微软雅黑' };
+      for (let c = 1; c <= 2; c++) {
+        statsSheet.getCell(sRow, c).border = {
+          top: { style: 'thin' }, left: { style: 'thin' },
+          bottom: { style: 'thin' }, right: { style: 'thin' }
+        };
+      }
+      sRow++;
     }
     
-    // 填充问题数据
-    let problemRow = 2;
-    for (const category of inspectionCategories) {
-      for (const item of category.items) {
-        const itemData = itemMap.get(item.itemNumber);
-        const actualScore = itemData?.actual_score ?? item.maxScore;
-        const deduction = item.maxScore - actualScore;
-        
-        // 只显示有扣分或有备注的项
-        if (deduction > 0 || itemData?.notes) {
-          const row = problemSheet.addRow([
-            category.name,
-            item.itemNumber,
-            item.description,
-            deduction,
-            itemData?.notes || '',
-            itemData?.rectification || ''
-          ]);
-          row.height = 30;
-          
-          for (let col = 1; col <= 6; col++) {
-            const cell = row.getCell(col);
-            cell.font = { size: 10, name: '微软雅黑' };
-            cell.alignment = { vertical: 'middle', wrapText: true };
-            cell.border = {
-              top: { style: 'thin' },
-              left: { style: 'thin' },
-              bottom: { style: 'thin' },
-              right: { style: 'thin' }
-            };
-          }
-          
-          // 扣分列居中
-          row.getCell(4).alignment = { horizontal: 'center', vertical: 'middle' };
-          if (deduction > 0) {
-            row.getCell(4).font = { size: 10, name: '微软雅黑', color: { argb: 'FFFF0000' } };
-          }
-          
-          problemRow++;
-        }
-      }
+    // 门店排名
+    sRow++;
+    statsSheet.mergeCells(`A${sRow}:C${sRow}`);
+    statsSheet.getCell(`A${sRow}`).value = '门店排名';
+    statsSheet.getCell(`A${sRow}`).font = { size: 11, bold: true, name: '微软雅黑' };
+    sRow++;
+    
+    // 排名表头
+    statsSheet.getCell(`A${sRow}`).value = '排名';
+    statsSheet.getCell(`B${sRow}`).value = '门店 / 次数 / 平均分';
+    statsSheet.getCell(`A${sRow}`).font = { size: 10, bold: true, name: '微软雅黑' };
+    statsSheet.getCell(`B${sRow}`).font = { size: 10, bold: true, name: '微软雅黑' };
+    statsSheet.getCell(`A${sRow}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD4AF37' } };
+    statsSheet.getCell(`B${sRow}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD4AF37' } };
+    for (let c = 1; c <= 2; c++) {
+      statsSheet.getCell(sRow, c).border = {
+        top: { style: 'thin' }, left: { style: 'thin' },
+        bottom: { style: 'thin' }, right: { style: 'thin' }
+      };
     }
+    sRow++;
+    
+    // 排名数据（单店只有1条）
+    statsSheet.getCell(`A${sRow}`).value = '1';
+    statsSheet.getCell(`B${sRow}`).value = ` ${inspection.store_name} / 1次 / ${totalScore}分`;
+    statsSheet.getCell(`A${sRow}`).font = { size: 10, name: '微软雅黑' };
+    statsSheet.getCell(`B${sRow}`).font = { size: 10, name: '微软雅黑' };
+    for (let c = 1; c <= 2; c++) {
+      statsSheet.getCell(sRow, c).border = {
+        top: { style: 'thin' }, left: { style: 'thin' },
+        bottom: { style: 'thin' }, right: { style: 'thin' }
+      };
+    }
+    sRow++;
+    
+    // 检查项模块分值分布
+    sRow++;
+    statsSheet.mergeCells(`A${sRow}:C${sRow}`);
+    statsSheet.getCell(`A${sRow}`).value = '检查项模块分值分布';
+    statsSheet.getCell(`A${sRow}`).font = { size: 11, bold: true, name: '微软雅黑' };
+    sRow++;
+    
+    // 表头
+    statsSheet.getCell(`A${sRow}`).value = '项目';
+    statsSheet.getCell(`B${sRow}`).value = '分值';
+    statsSheet.getCell(`C${sRow}`).value = '包含内容';
+    for (let c = 1; c <= 3; c++) {
+      statsSheet.getCell(sRow, c).font = { size: 10, bold: true, name: '微软雅黑' };
+      statsSheet.getCell(sRow, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD4AF37' } };
+      statsSheet.getCell(sRow, c).border = {
+        top: { style: 'thin' }, left: { style: 'thin' },
+        bottom: { style: 'thin' }, right: { style: 'thin' }
+      };
+    }
+    sRow++;
+    
+    // 各分类
+    const catNames = ['一', '二', '三', '四', '五', '六'];
+    inspectionCategories.forEach((cat, idx) => {
+      const itemNames = cat.items.map(i => i.description.substring(0, 10)).join('、');
+      statsSheet.getCell(`A${sRow}`).value = `${catNames[idx]}、${cat.name}`;
+      statsSheet.getCell(`B${sRow}`).value = `${cat.maxScore}分`;
+      statsSheet.getCell(`C${sRow}`).value = itemNames;
+      for (let c = 1; c <= 3; c++) {
+        statsSheet.getCell(sRow, c).font = { size: 10, name: '微软雅黑' };
+        statsSheet.getCell(sRow, c).alignment = { vertical: 'middle', wrapText: true };
+        statsSheet.getCell(sRow, c).border = {
+          top: { style: 'thin' }, left: { style: 'thin' },
+          bottom: { style: 'thin' }, right: { style: 'thin' }
+        };
+      }
+      sRow++;
+    });
+    
+    // ==================== Sheet 3: 问题汇总 ====================
+    const problemSheet = workbook.addWorksheet('问题汇总');
+    
+    // 列: A=区域, B=店铺名, C=负责人, D=督导, E=日期, F=得分, G-AM=35个检查项
+    const probColumns: Partial<ExcelJS.Column>[] = [
+      { width: 10 },  // A: 区域
+      { width: 14 },  // B: 店铺名
+      { width: 10 },  // C: 负责人
+      { width: 10 },  // D: 督导
+      { width: 12 },  // E: 日期
+      { width: 8 },   // F: 得分
+    ];
+    // 35个检查项列
+    allFlatItems.forEach(() => {
+      probColumns.push({ width: 10 });
+    });
+    problemSheet.columns = probColumns;
+    
+    // Row 1: 分类标题行
+    // A1-F1 空/合并
+    problemSheet.mergeCells('A1:F1');
+    
+    let colOffset = 7; // G列开始
+    inspectionCategories.forEach((cat) => {
+      const count = cat.items.length;
+      if (count > 1) {
+        problemSheet.mergeCells(1, colOffset, 1, colOffset + count - 1);
+      }
+      problemSheet.getCell(1, colOffset).value = `${cat.name}（${cat.maxScore}分）`;
+      problemSheet.getCell(1, colOffset).font = { size: 9, bold: true, name: '微软雅黑' };
+      problemSheet.getCell(1, colOffset).alignment = { horizontal: 'center', vertical: 'middle' };
+      problemSheet.getCell(1, colOffset).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD4AF37' } };
+      colOffset += count;
+    });
+    // 设置A1-F1样式
+    for (let c = 1; c <= 6; c++) {
+      problemSheet.getCell(1, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD4AF37' } };
+    }
+    problemSheet.getRow(1).height = 25;
+    
+    // Row 2: 序号行
+    const seqLabels = ['区域', '店铺名', '负责人', '督导', '日期', '得分'];
+    seqLabels.forEach((label, idx) => {
+      problemSheet.getCell(2, idx + 1).value = label;
+    });
+    allFlatItems.forEach((item, idx) => {
+      problemSheet.getCell(2, 7 + idx).value = item.itemNumber;
+    });
+    for (let c = 1; c <= 6 + allFlatItems.length; c++) {
+      problemSheet.getCell(2, c).font = { size: 9, bold: true, name: '微软雅黑' };
+      problemSheet.getCell(2, c).alignment = { horizontal: 'center', vertical: 'middle' };
+      problemSheet.getCell(2, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
+      problemSheet.getCell(2, c).border = {
+        top: { style: 'thin' }, left: { style: 'thin' },
+        bottom: { style: 'thin' }, right: { style: 'thin' }
+      };
+    }
+    problemSheet.getRow(2).height = 20;
+    
+    // Row 3: 检查标准行
+    const descLabels = ['', '', '', '', '', ''];
+    allFlatItems.forEach(item => {
+      descLabels.push(`${item.description}（${item.maxScore}分）`);
+    });
+    const row3 = problemSheet.getRow(3);
+    row3.values = descLabels;
+    for (let c = 1; c <= 6 + allFlatItems.length; c++) {
+      problemSheet.getCell(3, c).font = { size: 8, name: '微软雅黑' };
+      problemSheet.getCell(3, c).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      problemSheet.getCell(3, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF8DC' } };
+      problemSheet.getCell(3, c).border = {
+        top: { style: 'thin' }, left: { style: 'thin' },
+        bottom: { style: 'thin' }, right: { style: 'thin' }
+      };
+    }
+    problemSheet.getRow(3).height = 50;
+    
+    // Row 4: 数据行
+    const dataRow: any[] = [
+      region,
+      inspection.store_name,
+      responsible,
+      inspection.supervisor_name,
+      inspection.inspection_date,
+      inspection.total_score
+    ];
+    
+    allFlatItems.forEach(item => {
+      const itemData = itemMap.get(item.itemNumber);
+      const actualScore = itemData?.actual_score ?? item.maxScore;
+      const deduction = item.maxScore - actualScore;
+      if (deduction > 0) {
+        dataRow.push(`扣${deduction}分`);
+      } else {
+        dataRow.push('');
+      }
+    });
+    
+    const dRow = problemSheet.getRow(4);
+    dRow.values = dataRow;
+    dRow.height = 25;
+    for (let c = 1; c <= 6 + allFlatItems.length; c++) {
+      problemSheet.getCell(4, c).font = { size: 9, name: '微软雅黑' };
+      problemSheet.getCell(4, c).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      problemSheet.getCell(4, c).border = {
+        top: { style: 'thin' }, left: { style: 'thin' },
+        bottom: { style: 'thin' }, right: { style: 'thin' }
+      };
+    }
+    // 扣分红字
+    allFlatItems.forEach((item, idx) => {
+      const itemData = itemMap.get(item.itemNumber);
+      const actualScore = itemData?.actual_score ?? item.maxScore;
+      const deduction = item.maxScore - actualScore;
+      if (deduction > 0) {
+        problemSheet.getCell(4, 7 + idx).font = { size: 9, name: '微软雅黑', color: { argb: 'FFFF0000' } };
+      }
+    });
     
     // 生成 Excel 文件
     const buffer = await workbook.xlsx.writeBuffer();
