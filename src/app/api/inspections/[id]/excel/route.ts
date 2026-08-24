@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import ExcelJS from 'exceljs';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 import { inspectionCategories } from '@/lib/inspection-data';
+import { getSignedUrl, downloadFile } from '@/lib/storage';
 
 export async function GET(
   request: NextRequest,
@@ -98,19 +99,18 @@ export async function GET(
       '负责人',         // C
       '检查日期',       // D
       '督导',           // E
-      '检查大类',       // F
+      '检查项目',       // F
       '序号',           // G
-      '检查项目及标准', '', '',  // H-J: 合并
-      '满分',           // K
-      '得分',           // L
-      '扣分',           // M
-      '问题记录',       // N
-      '现场照片'        // O
+      '检查标准',       // H
+      '满分',           // I
+      '得分',           // J
+      '现场照片',       // K
+      '扣分',           // L
+      '备注'            // M
     ]);
     headerRow.height = 25;
-    checkSheet.mergeCells('H3:J3');
     
-    for (let col = 1; col <= 15; col++) {
+    for (let col = 1; col <= 13; col++) {
       const cell = headerRow.getCell(col);
       cell.font = { size: 10, bold: true, name: '微软雅黑' };
       cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
@@ -135,6 +135,9 @@ export async function GET(
         const rectification = itemData?.rectification || '';
         const deduction = item.maxScore - actualScore;
         
+        // 获取照片
+        const photoKeys = itemData?.photo_keys ? JSON.parse(itemData.photo_keys) : [];
+        
         // 合并问题记录和整改措施
         let displayNotes = notes;
         if (rectification) {
@@ -147,21 +150,20 @@ export async function GET(
           responsible,               // C: 负责人
           inspection.inspection_date, // D: 检查日期
           inspection.supervisor_name, // E: 督导
-          '',                        // F: 检查大类（稍后合并）
+          '',                        // F: 检查项目（稍后合并）
           item.itemNumber,           // G: 序号
-          item.description, '', '',  // H-J: 检查项内容（合并）
-          item.maxScore,             // K: 满分
-          actualScore,               // L: 得分
-          deduction,                 // M: 扣分
-          displayNotes,              // N: 问题记录（含整改措施）
-          ''                         // O: 现场照片
+          item.description,          // H: 检查标准
+          item.maxScore,             // I: 满分
+          actualScore,               // J: 得分
+          '',                        // K: 现场照片
+          deduction,                 // L: 扣分
+          displayNotes               // M: 备注
         ]);
         
         row.height = 35;
-        checkSheet.mergeCells(`H${rowNum}:J${rowNum}`);
         
         // 设置边框和对齐
-        for (let col = 1; col <= 15; col++) {
+        for (let col = 1; col <= 13; col++) {
           const cell = row.getCell(col);
           cell.font = { size: 10, name: '微软雅黑' };
           cell.alignment = { vertical: 'middle', wrapText: true };
@@ -176,20 +178,41 @@ export async function GET(
         // 居中的列
         row.getCell(6).alignment = { horizontal: 'center', vertical: 'middle' };
         row.getCell(7).alignment = { horizontal: 'center', vertical: 'middle' };
+        row.getCell(9).alignment = { horizontal: 'center', vertical: 'middle' };
+        row.getCell(10).alignment = { horizontal: 'center', vertical: 'middle' };
         row.getCell(11).alignment = { horizontal: 'center', vertical: 'middle' };
         row.getCell(12).alignment = { horizontal: 'center', vertical: 'middle' };
-        row.getCell(13).alignment = { horizontal: 'center', vertical: 'middle' };
         
         // 得分颜色
-        const scoreCell = row.getCell(12);
+        const scoreCell = row.getCell(10);
         if (actualScore < item.maxScore) {
           scoreCell.font = { size: 10, name: '微软雅黑', color: { argb: 'FFFF0000' } };
         }
         
         // 扣分颜色
-        const deductionCell = row.getCell(13);
+        const deductionCell = row.getCell(12);
         if (deduction > 0) {
           deductionCell.font = { size: 10, name: '微软雅黑', color: { argb: 'FFFF0000' } };
+        }
+        
+        // 插入照片到K列
+        if (photoKeys.length > 0) {
+          try {
+            const firstPhotoKey = photoKeys[0];
+            const photoBuffer = await downloadFile(firstPhotoKey);
+            if (photoBuffer) {
+              const imageId = workbook.addImage({
+                buffer: new Uint8Array(photoBuffer),
+                extension: 'jpeg',
+              });
+              checkSheet.addImage(imageId, {
+                tl: { col: 10.5, row: rowNum - 2.5 },
+                ext: { width: 80, height: 80 }
+              });
+            }
+          } catch (photoError) {
+            console.error('插入照片失败:', photoError);
+          }
         }
         
         rowNum++;
@@ -208,15 +231,15 @@ export async function GET(
     }
     
     // 总分行
-    const totalRow = checkSheet.addRow(['', '', '', '', '', '总  分', '', '', '', '', '', '', '', inspection.total_score, '']);
+    const totalRow = checkSheet.addRow(['', '', '', '', '', '总  分', '', '', '', '', '', inspection.total_score, '']);
     totalRow.height = 25;
     checkSheet.mergeCells(`A${rowNum}:E${rowNum}`);
-    checkSheet.mergeCells(`F${rowNum}:N${rowNum}`);
+    checkSheet.mergeCells(`F${rowNum}:L${rowNum}`);
     checkSheet.getCell(`F${rowNum}`).font = { size: 12, bold: true, name: '微软雅黑' };
     checkSheet.getCell(`F${rowNum}`).alignment = { horizontal: 'center', vertical: 'middle' };
-    checkSheet.getCell(`O${rowNum}`).font = { size: 14, bold: true, name: '微软雅黑', color: { argb: 'FFD4AF37' } };
-    checkSheet.getCell(`O${rowNum}`).alignment = { horizontal: 'center', vertical: 'middle' };
-    for (let col = 1; col <= 15; col++) {
+    checkSheet.getCell(`M${rowNum}`).font = { size: 14, bold: true, name: '微软雅黑', color: { argb: 'FFD4AF37' } };
+    checkSheet.getCell(`M${rowNum}`).alignment = { horizontal: 'center', vertical: 'middle' };
+    for (let col = 1; col <= 13; col++) {
       totalRow.getCell(col).border = {
         top: { style: 'thin' },
         left: { style: 'thin' },
@@ -230,16 +253,16 @@ export async function GET(
     const ratingText = inspection.rating === '优秀' 
       ? '优秀（90-100分）' 
       : (inspection.rating === '良好' ? '良好（70-89分）' : '较差（<70分）');
-    const ratingRow = checkSheet.addRow(['', '', '', '', '', '评定等级', '', '', '', '', '', '', '', ratingText, '']);
+    const ratingRow = checkSheet.addRow(['', '', '', '', '', '评定等级', '', '', '', '', '', ratingText, '']);
     ratingRow.height = 25;
     checkSheet.mergeCells(`A${rowNum}:E${rowNum}`);
-    checkSheet.mergeCells(`F${rowNum}:N${rowNum}`);
+    checkSheet.mergeCells(`F${rowNum}:L${rowNum}`);
     checkSheet.getCell(`F${rowNum}`).font = { size: 12, bold: true, name: '微软雅黑' };
     checkSheet.getCell(`F${rowNum}`).alignment = { horizontal: 'center', vertical: 'middle' };
-    const ratingCell = checkSheet.getCell(`O${rowNum}`);
+    const ratingCell = checkSheet.getCell(`M${rowNum}`);
     ratingCell.font = { size: 12, bold: true, name: '微软雅黑', color: { argb: 'FFD4AF37' } };
     ratingCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    for (let col = 1; col <= 15; col++) {
+    for (let col = 1; col <= 13; col++) {
       ratingRow.getCell(col).border = {
         top: { style: 'thin' },
         left: { style: 'thin' },
@@ -249,9 +272,9 @@ export async function GET(
     }
     
     // 导出时间
-    const exportTimeRow = checkSheet.addRow([`导出时间：${new Date().toLocaleString('zh-CN')}`, '', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+    const exportTimeRow = checkSheet.addRow([`导出时间：${new Date().toLocaleString('zh-CN')}`, '', '', '', '', '', '', '', '', '', '', '', '']);
     exportTimeRow.height = 20;
-    checkSheet.mergeCells(`A${rowNum + 1}:O${rowNum + 1}`);
+    checkSheet.mergeCells(`A${rowNum + 1}:M${rowNum + 1}`);
     checkSheet.getCell(`A${rowNum + 1}`).font = { size: 9, name: '微软雅黑', color: { argb: 'FF888888' } };
     
     // ==================== Sheet 2: 问题汇总表 ====================
