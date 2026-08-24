@@ -5,14 +5,21 @@ import { getSupabaseClient } from '@/storage/database/supabase-client';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
+  const dateParam = request.nextUrl.searchParams.get('date');
   const days = parseInt(request.nextUrl.searchParams.get('days') || '30');
-  const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - days);
+  
+  let cutoffDate: Date;
+  if (dateParam) {
+    cutoffDate = new Date(dateParam);
+  } else {
+    cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
+  }
 
   const supabase = getSupabaseClient();
 
   // 获取所有检查记录
-  const { data: inspections, error } = await supabase
+  const { data: inspections, error } = await getSupabaseClient()
     .from('inspections')
     .select('*')
     .gte('inspection_date', cutoffDate.toISOString().split('T')[0])
@@ -44,13 +51,13 @@ export async function GET(request: NextRequest) {
     const storeName = inspection.store_name;
     const region = inspection.region;
     const personInCharge = inspection.person_in_charge;
-    const supervisor = inspection.supervisor;
+    const supervisor = inspection.supervisor_name;
     const inspectionDate = inspection.inspection_date;
     const totalScore = inspection.total_score;
     const rating = inspection.rating;
 
     // 获取检查项明细
-    const { data: items } = await supabase
+    const { data: items } = await getSupabaseClient()
       .from('inspection_items')
       .select('*')
       .eq('inspection_id', inspectionId)
