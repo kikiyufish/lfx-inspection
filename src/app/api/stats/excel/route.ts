@@ -383,14 +383,15 @@ export async function GET(request: NextRequest) {
     problemSheet.getRow(3).height = 50;
     
     // Row 4: 表头行（红色背景白色文字）
-    const headerLabels: any[] = [undefined, '区域', '店铺名', '负责人', '日期', '督导', '得分'];
-    problemSheet.getRow(4).values = headerLabels;
-    for (let c = 1; c <= 6; c++) {
-      problemSheet.getCell(4, c).font = { size: 10, bold: true, name: '微软雅黑', color: { argb: 'FFFFFFFF' } };
-      problemSheet.getCell(4, c).alignment = { horizontal: 'center', vertical: 'middle' };
-      problemSheet.getCell(4, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC00000' } };
-      problemSheet.getCell(4, c).border = borderStyle;
-    }
+    const headerLabels = ['区域', '店铺名', '负责人', '日期', '督导', '得分'];
+    headerLabels.forEach((label, idx) => {
+      const cell = problemSheet.getCell(4, idx + 1);
+      cell.value = label;
+      cell.font = { size: 10, bold: true, name: '微软雅黑', color: { argb: 'FFFFFFFF' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC00000' } };
+      cell.border = borderStyle;
+    });
     problemSheet.getRow(4).height = 25;
     
     // Row 5+: 每个检查记录一行
@@ -400,32 +401,30 @@ export async function GET(request: NextRequest) {
       const inspItemMap = new Map<number, any>();
       inspItems.forEach((item: any) => inspItemMap.set(item.item_number, item));
       
-      const dataRow: any[] = [
-        undefined, // ExcelJS values is 1-indexed, index 0 is ignored
-        insp.region || '',
-        insp.store_name,
-        insp.responsible_person || '',
-        insp.inspection_date,
-        insp.supervisor_name,
-        insp.total_score
-      ];
+      // 直接设置单元格值（1-based 索引）
+      problemSheet.getCell(probRowNum, 1).value = insp.region || '';
+      problemSheet.getCell(probRowNum, 2).value = insp.store_name;
+      problemSheet.getCell(probRowNum, 3).value = insp.responsible_person || '';
+      problemSheet.getCell(probRowNum, 4).value = insp.inspection_date;
+      problemSheet.getCell(probRowNum, 5).value = insp.supervisor_name;
+      problemSheet.getCell(probRowNum, 6).value = insp.total_score;
       
-      allFlatItems.forEach(item => {
+      // 检查项扣分
+      allFlatItems.forEach((item, idx) => {
         const itemData = inspItemMap.get(item.itemNumber);
         const actualScore = itemData?.actual_score ?? item.maxScore;
         const deduction = item.maxScore - actualScore;
+        const colNum = 7 + idx;
         if (deduction > 0) {
           // 显示扣分原因
           const note = itemData?.notes || '';
-          dataRow.push(note ? `${note}-${deduction}` : `-${deduction}`);
+          problemSheet.getCell(probRowNum, colNum).value = note ? `${note}-${deduction}` : `-${deduction}`;
         } else {
-          dataRow.push('');
+          problemSheet.getCell(probRowNum, colNum).value = '';
         }
       });
       
-      const dRow = problemSheet.getRow(probRowNum);
-      dRow.values = dataRow;
-      dRow.height = 25;
+      problemSheet.getRow(probRowNum).height = 25;
       for (let c = 1; c <= 6 + allFlatItems.length; c++) {
         problemSheet.getCell(probRowNum, c).font = { size: 9, name: '微软雅黑' };
         problemSheet.getCell(probRowNum, c).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };

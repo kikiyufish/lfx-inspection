@@ -411,47 +411,44 @@ export async function GET(
     problemSheet.getRow(3).height = 50;
     
     // Row 4: 表头行（红色背景白色文字）
-    const headerLabels: any[] = [undefined, '区域', '店铺名', '负责人', '日期', '督导', '得分'];
-    const row4 = problemSheet.getRow(4);
-    row4.values = headerLabels;
-    for (let c = 1; c <= 6; c++) {
-      problemSheet.getCell(4, c).font = { size: 10, bold: true, name: '微软雅黑', color: { argb: 'FFFFFFFF' } };
-      problemSheet.getCell(4, c).alignment = { horizontal: 'center', vertical: 'middle' };
-      problemSheet.getCell(4, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC00000' } };
-      problemSheet.getCell(4, c).border = {
+    const headerLabels = ['区域', '店铺名', '负责人', '日期', '督导', '得分'];
+    headerLabels.forEach((label, idx) => {
+      const cell = problemSheet.getCell(4, idx + 1);
+      cell.value = label;
+      cell.font = { size: 10, bold: true, name: '微软雅黑', color: { argb: 'FFFFFFFF' } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC00000' } };
+      cell.border = {
         top: { style: 'thin' }, left: { style: 'thin' },
         bottom: { style: 'thin' }, right: { style: 'thin' }
       };
-    }
+    });
     problemSheet.getRow(4).height = 25;
     
     // Row 5: 数据行
-    const dataRow: any[] = [
-      undefined, // ExcelJS values is 1-indexed, index 0 is ignored
-      region,
-      inspection.store_name,
-      responsible,
-      inspection.inspection_date,
-      inspection.supervisor_name,
-      inspection.total_score
-    ];
+    // 直接设置单元格值（1-based 索引）
+    problemSheet.getCell(5, 1).value = region;
+    problemSheet.getCell(5, 2).value = inspection.store_name;
+    problemSheet.getCell(5, 3).value = responsible;
+    problemSheet.getCell(5, 4).value = inspection.inspection_date;
+    problemSheet.getCell(5, 5).value = inspection.supervisor_name;
+    problemSheet.getCell(5, 6).value = inspection.total_score;
     
-    allFlatItems.forEach(item => {
+    allFlatItems.forEach((item, idx) => {
       const itemData = itemMap.get(item.itemNumber);
       const actualScore = itemData?.actual_score ?? item.maxScore;
       const deduction = item.maxScore - actualScore;
+      const colNum = 7 + idx;
       if (deduction > 0) {
         // 显示扣分原因
         const note = itemData?.notes || '';
-        dataRow.push(note ? `${note}-${deduction}` : `-${deduction}`);
+        problemSheet.getCell(5, colNum).value = note ? `${note}-${deduction}` : `-${deduction}`;
       } else {
-        dataRow.push('');
+        problemSheet.getCell(5, colNum).value = '';
       }
     });
     
-    const dRow = problemSheet.getRow(5);
-    dRow.values = dataRow;
-    dRow.height = 25;
+    problemSheet.getRow(5).height = 25;
     for (let c = 1; c <= 6 + allFlatItems.length; c++) {
       problemSheet.getCell(5, c).font = { size: 9, name: '微软雅黑' };
       problemSheet.getCell(5, c).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
