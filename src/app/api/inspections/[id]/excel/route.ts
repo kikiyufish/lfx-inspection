@@ -348,63 +348,49 @@ export async function GET(
     // ==================== Sheet 3: 问题汇总 ====================
     const problemSheet = workbook.addWorksheet('问题汇总');
     
-    // 列: A=区域, B=店铺名, C=负责人, D=督导, E=日期, F=得分, G-AM=35个检查项
+    // 列: A=区域, B=店铺名, C=负责人, D=日期, E=督导, F=得分, G-AM=35个检查项
     const probColumns: Partial<ExcelJS.Column>[] = [
       { width: 10 },  // A: 区域
-      { width: 14 },  // B: 店铺名
+      { width: 18 },  // B: 店铺名
       { width: 10 },  // C: 负责人
-      { width: 10 },  // D: 督导
-      { width: 12 },  // E: 日期
+      { width: 12 },  // D: 日期
+      { width: 10 },  // E: 督导
       { width: 8 },   // F: 得分
     ];
     // 35个检查项列
     allFlatItems.forEach(() => {
-      probColumns.push({ width: 10 });
+      probColumns.push({ width: 12 });
     });
     problemSheet.columns = probColumns;
     
     // 冻结窗口至得分列（F列），前6列固定
     problemSheet.views = [{ state: 'frozen', xSplit: 6, ySplit: 3 }];
     
-    // Row 1: 分类标题行
-    // A1-F1 空/合并
-    problemSheet.mergeCells('A1:F1');
-    
-    let colOffset = 7; // G列开始
+    // Row 1: 分类标题行（从G列开始）
+    let colOffset = 7;
     inspectionCategories.forEach((cat) => {
       const count = cat.items.length;
       if (count > 1) {
         problemSheet.mergeCells(1, colOffset, 1, colOffset + count - 1);
       }
       problemSheet.getCell(1, colOffset).value = `${cat.name}（${cat.maxScore}分）`;
-      problemSheet.getCell(1, colOffset).font = { size: 9, bold: true, name: '微软雅黑' };
+      problemSheet.getCell(1, colOffset).font = { size: 10, bold: true, name: '微软雅黑', color: { argb: 'FFFFFFFF' } };
       problemSheet.getCell(1, colOffset).alignment = { horizontal: 'center', vertical: 'middle' };
-      problemSheet.getCell(1, colOffset).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD4AF37' } };
+      problemSheet.getCell(1, colOffset).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC00000' } };
       colOffset += count;
     });
-    // 设置A1-F1样式
-    for (let c = 1; c <= 6; c++) {
-      problemSheet.getCell(1, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD4AF37' } };
-    }
-    problemSheet.getRow(1).height = 25;
+    problemSheet.getRow(1).height = 30;
     
     // Row 2: 序号行
-    const seqLabels = ['区域', '店铺名', '负责人', '督导', '日期', '得分'];
-    seqLabels.forEach((label, idx) => {
-      problemSheet.getCell(2, idx + 1).value = label;
-    });
     allFlatItems.forEach((item, idx) => {
       problemSheet.getCell(2, 7 + idx).value = item.itemNumber;
-    });
-    for (let c = 1; c <= 6 + allFlatItems.length; c++) {
-      problemSheet.getCell(2, c).font = { size: 9, bold: true, name: '微软雅黑' };
-      problemSheet.getCell(2, c).alignment = { horizontal: 'center', vertical: 'middle' };
-      problemSheet.getCell(2, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF2CC' } };
-      problemSheet.getCell(2, c).border = {
+      problemSheet.getCell(2, 7 + idx).font = { size: 9, bold: true, name: '微软雅黑' };
+      problemSheet.getCell(2, 7 + idx).alignment = { horizontal: 'center', vertical: 'middle' };
+      problemSheet.getCell(2, 7 + idx).border = {
         top: { style: 'thin' }, left: { style: 'thin' },
         bottom: { style: 'thin' }, right: { style: 'thin' }
       };
-    }
+    });
     problemSheet.getRow(2).height = 20;
     
     // Row 3: 检查标准行
@@ -414,10 +400,9 @@ export async function GET(
     });
     const row3 = problemSheet.getRow(3);
     row3.values = descLabels;
-    for (let c = 1; c <= 6 + allFlatItems.length; c++) {
+    for (let c = 7; c <= 6 + allFlatItems.length; c++) {
       problemSheet.getCell(3, c).font = { size: 8, name: '微软雅黑' };
       problemSheet.getCell(3, c).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-      problemSheet.getCell(3, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF8DC' } };
       problemSheet.getCell(3, c).border = {
         top: { style: 'thin' }, left: { style: 'thin' },
         bottom: { style: 'thin' }, right: { style: 'thin' }
@@ -425,14 +410,29 @@ export async function GET(
     }
     problemSheet.getRow(3).height = 50;
     
-    // Row 4: 数据行
+    // Row 4: 表头行（红色背景白色文字）
+    const headerLabels: any[] = [undefined, '区域', '店铺名', '负责人', '日期', '督导', '得分'];
+    const row4 = problemSheet.getRow(4);
+    row4.values = headerLabels;
+    for (let c = 1; c <= 6; c++) {
+      problemSheet.getCell(4, c).font = { size: 10, bold: true, name: '微软雅黑', color: { argb: 'FFFFFFFF' } };
+      problemSheet.getCell(4, c).alignment = { horizontal: 'center', vertical: 'middle' };
+      problemSheet.getCell(4, c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC00000' } };
+      problemSheet.getCell(4, c).border = {
+        top: { style: 'thin' }, left: { style: 'thin' },
+        bottom: { style: 'thin' }, right: { style: 'thin' }
+      };
+    }
+    problemSheet.getRow(4).height = 25;
+    
+    // Row 5: 数据行
     const dataRow: any[] = [
       undefined, // ExcelJS values is 1-indexed, index 0 is ignored
       region,
       inspection.store_name,
       responsible,
-      inspection.supervisor_name,
       inspection.inspection_date,
+      inspection.supervisor_name,
       inspection.total_score
     ];
     
@@ -441,30 +441,33 @@ export async function GET(
       const actualScore = itemData?.actual_score ?? item.maxScore;
       const deduction = item.maxScore - actualScore;
       if (deduction > 0) {
-        dataRow.push(`扣${deduction}分`);
+        // 显示扣分原因
+        const note = itemData?.notes || '';
+        dataRow.push(note ? `${note}-${deduction}` : `-${deduction}`);
       } else {
         dataRow.push('');
       }
     });
     
-    const dRow = problemSheet.getRow(4);
+    const dRow = problemSheet.getRow(5);
     dRow.values = dataRow;
     dRow.height = 25;
     for (let c = 1; c <= 6 + allFlatItems.length; c++) {
-      problemSheet.getCell(4, c).font = { size: 9, name: '微软雅黑' };
-      problemSheet.getCell(4, c).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-      problemSheet.getCell(4, c).border = {
+      problemSheet.getCell(5, c).font = { size: 9, name: '微软雅黑' };
+      problemSheet.getCell(5, c).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      problemSheet.getCell(5, c).border = {
         top: { style: 'thin' }, left: { style: 'thin' },
         bottom: { style: 'thin' }, right: { style: 'thin' }
       };
     }
-    // 扣分红字
+    // 得分和扣分红字
+    problemSheet.getCell(5, 6).font = { size: 9, name: '微软雅黑', color: { argb: 'FFFF0000' } };
     allFlatItems.forEach((item, idx) => {
       const itemData = itemMap.get(item.itemNumber);
       const actualScore = itemData?.actual_score ?? item.maxScore;
       const deduction = item.maxScore - actualScore;
       if (deduction > 0) {
-        problemSheet.getCell(4, 7 + idx).font = { size: 9, name: '微软雅黑', color: { argb: 'FFFF0000' } };
+        problemSheet.getCell(5, 7 + idx).font = { size: 9, name: '微软雅黑', color: { argb: 'FFFF0000' } };
       }
     });
     
