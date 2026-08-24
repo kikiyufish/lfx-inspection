@@ -378,7 +378,7 @@ export async function GET(request: NextRequest) {
     problemSheet.getRow(2).height = 20;
     
     // Row 3: 检查标准行
-    const descLabels: string[] = ['', '', '', '', '', ''];
+    const descLabels: any[] = [undefined, '', '', '', '', '', '']; // 1-indexed, index 0 ignored
     allFlatItems.forEach(item => {
       descLabels.push(`${item.description}（${item.maxScore}分）`);
     });
@@ -399,6 +399,7 @@ export async function GET(request: NextRequest) {
       inspItems.forEach((item: any) => inspItemMap.set(item.item_number, item));
       
       const dataRow: any[] = [
+        undefined, // ExcelJS values is 1-indexed, index 0 is ignored
         insp.region || '',
         insp.store_name,
         insp.responsible_person || '',

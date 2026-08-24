@@ -405,7 +405,7 @@ export async function GET(
     problemSheet.getRow(2).height = 20;
     
     // Row 3: 检查标准行
-    const descLabels = ['', '', '', '', '', ''];
+    const descLabels: any[] = [undefined, '', '', '', '', '', '']; // 1-indexed, index 0 ignored
     allFlatItems.forEach(item => {
       descLabels.push(`${item.description}（${item.maxScore}分）`);
     });
@@ -424,6 +424,7 @@ export async function GET(
     
     // Row 4: 数据行
     const dataRow: any[] = [
+      undefined, // ExcelJS values is 1-indexed, index 0 is ignored
       region,
       inspection.store_name,
       responsible,
