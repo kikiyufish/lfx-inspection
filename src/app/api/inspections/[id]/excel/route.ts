@@ -363,6 +363,9 @@ export async function GET(
     });
     problemSheet.columns = probColumns;
     
+    // 冻结窗口至得分列（F列），前6列固定
+    problemSheet.views = [{ state: 'frozen', xSplit: 6, ySplit: 3 }];
+    
     // Row 1: 分类标题行
     // A1-F1 空/合并
     problemSheet.mergeCells('A1:F1');
