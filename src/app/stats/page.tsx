@@ -660,7 +660,7 @@ export default function StatsPage() {
           index + 1,
           inspection.store_name,
           inspection.region || "",
-          "", // 区域经理
+          inspection.responsible_person || "", // 区域经理（负责人）
           inspection.supervisor_name,
           inspection.inspection_date,
           inspection.total_score,
