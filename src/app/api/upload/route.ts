@@ -1,13 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { S3Storage } from "coze-coding-dev-sdk";
+import { getSupabaseClient } from "@/storage/database/supabase-client";
 
-const storage = new S3Storage({
-  endpointUrl: process.env.COZE_BUCKET_ENDPOINT_URL,
-  accessKey: process.env.COZE_BUCKET_ACCESS_KEY || "",
-  secretKey: process.env.COZE_BUCKET_SECRET_KEY || "",
-  bucketName: process.env.COZE_BUCKET_NAME,
-  region: "cn-beijing",
-});
+const BUCKET_NAME = "inspection-photos";
 
 // POST - 上传检查照片
 export async function POST(request: NextRequest) {
@@ -40,19 +34,25 @@ export async function POST(request: NextRequest) {
     // 生成文件名
     const timestamp = Date.now();
     const ext = file.name.split(".").pop() || "jpg";
-    const fileName = `inspection/item_${itemName || "unknown"}/${timestamp}.${ext}`;
+    const filePath = `inspection/item_${itemName || "unknown"}/${timestamp}.${ext}`;
 
-    // 上传到对象存储
+    // 上传到 Supabase Storage
+    const supabase = getSupabaseClient();
     const buffer = Buffer.from(await file.arrayBuffer());
-    const key = await storage.uploadFile({
-      fileContent: buffer,
-      fileName,
-      contentType: file.type,
-    });
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET_NAME)
+      .upload(filePath, buffer, {
+        contentType: file.type,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      throw new Error(`上传失败: ${uploadError.message}`);
+    }
 
     return NextResponse.json({
       success: true,
-      data: { key, fileName },
+      data: { key: filePath, fileName: filePath },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "上传失败";

@@ -1,28 +1,35 @@
-import { S3Storage } from "coze-coding-dev-sdk";
+import { getSupabaseClient } from "@/storage/database/supabase-client";
 
-const storage = new S3Storage({
-  endpointUrl: process.env.COZE_BUCKET_ENDPOINT_URL,
-  accessKey: process.env.COZE_BUCKET_ACCESS_KEY || "",
-  secretKey: process.env.COZE_BUCKET_SECRET_KEY || "",
-  bucketName: process.env.COZE_BUCKET_NAME,
-  region: "cn-beijing",
-});
+const BUCKET_NAME = "inspection-photos";
 
 /**
- * 获取文件的签名URL
+ * 获取文件的签名URL（通过 Supabase Storage）
  */
-export async function getSignedUrl(key: string, expireTime = 3600): Promise<string> {
-  return storage.generatePresignedUrl({ key, expireTime });
+export async function getSignedUrl(key: string, expireTime = 86400): Promise<string> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.storage
+    .from(BUCKET_NAME)
+    .createSignedUrl(key, expireTime);
+
+  if (error || !data?.signedUrl) {
+    throw new Error(`生成签名URL失败: ${error?.message || "未知错误"}`);
+  }
+  return data.signedUrl;
 }
 
 /**
- * 下载文件内容
+ * 下载文件内容（通过 Supabase Storage）
  */
 export async function downloadFile(key: string): Promise<Buffer> {
-  const url = await getSignedUrl(key);
-  const response = await fetch(url);
-  const arrayBuffer = await response.arrayBuffer();
-  return Buffer.from(arrayBuffer) as Buffer;
-}
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.storage
+    .from(BUCKET_NAME)
+    .download(key);
 
-export { storage };
+  if (error || !data) {
+    throw new Error(`下载文件失败: ${error?.message || "未知错误"}`);
+  }
+
+  const arrayBuffer = await data.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
