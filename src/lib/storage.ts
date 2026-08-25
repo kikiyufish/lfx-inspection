@@ -22,7 +22,7 @@ export async function downloadFile(key: string): Promise<Buffer> {
   const url = await getSignedUrl(key);
   const response = await fetch(url);
   const arrayBuffer = await response.arrayBuffer();
-  return Buffer.from(arrayBuffer);
+  return Buffer.from(arrayBuffer) as Buffer;
 }
 
 export { storage };

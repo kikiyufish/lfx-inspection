@@ -346,7 +346,7 @@ export async function GET(
     });
     
     const buffer = await workbook.xlsx.writeBuffer();
-    const base64 = Buffer.from(buffer).toString('base64');
+    const base64 = Buffer.from(buffer as any).toString('base64');
     
     return new Response(JSON.stringify({
       success: true,
